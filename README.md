@@ -13,7 +13,7 @@ brew install onnxruntime
 Export the lib path:
 
 ```shell
-export ONNX_RUNTIME_LIB_DIR=$(brew --prefix onnxruntime)/lib
+export ONNX_RUNTIME_LIB_DIR=$(brew --prefix onnxruntime)
 ```
 
 ## Testing
