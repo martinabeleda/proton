@@ -11,10 +11,27 @@ use std::error::Error;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::fs;
+use onnxruntime::environment::Environment;
+use onnxruntime::session::Session;
+use onnxruntime::{GraphOptimizationLevel, LoggingLevel};
 
 use crate::backend::onnx::infer_onnx_model;
 
-#[derive(Debug, Deserialize)]
+#[macro_use]
+extern crate lazy_static;
+
+
+lazy_static!{
+    pub static ref ENVIRONMENT: Arc<Environment> = Arc::new(
+        Environment::builder()
+            .with_name("onnx proton")
+            .with_log_level(LoggingLevel::Warning)
+            .build()
+            .unwrap()
+    );
+}
+
+#[derive(Clone, Debug, Deserialize)]
 struct ModelConfig {
     name: String,
     path: String,
@@ -37,8 +54,22 @@ async fn load_config() -> Result<Config, Box<dyn Error>> {
     Ok(config)
 }
 
+async fn load_models(config: &Config) -> Result<Session, Box<dyn Error>> {
+    // For now, let's just load the first model in the config
+    let model_config = config.models[0].clone();
+
+    let mut session = &ENVIRONMENT
+        .new_session_builder()?
+        .with_optimization_level(GraphOptimizationLevel::Basic)?
+        .with_number_threads(1)?
+        .with_model_from_file(&config.models[0].path)
+        .unwrap();
+
+    Ok(session)
+}
+
 async fn handle_inference(
-    Extension(models): Extension<Arc<HashMap<String, String>>>,
+    Extension(models): Extension<Arc<Session>>,
     Json(info): Json<InferenceRequest>,
 ) -> impl IntoResponse {
     let model_name = &info.model_name;
@@ -58,17 +89,16 @@ async fn main() {
     let config = load_config().await.unwrap();
     println!("Loaded config: {:?}", config);
 
-    let models: HashMap<String, String> = config
-        .models
-        .into_iter()
-        .map(|model_config| (model_config.name, model_config.path))
-        .collect();
+    // Initialize the ONNX environment and sessions
+    // For now, we just load the first model in the config
+    // but in the future, we'll load all of the models
+    let models = load_models(&config).await.unwrap();
 
-    let models = Arc::new(models);
+    let shared_state = Arc::new(models);
 
     let app = Router::new()
         .route("/infer", post(handle_inference))
-        .layer(Extension(models));
+        .layer(Extension(shared_state));
 
     let addr = SocketAddr::from(([127, 0, 0, 1], 8080));
 
