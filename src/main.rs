@@ -1,14 +1,13 @@
+pub mod backend;
+
 use axum::{
-    extract::{Extension, Json},
-    handler::post,
+    routing::post,
     http::StatusCode,
     response::IntoResponse,
-    Router,
+    Router, Json
 };
 use serde::Deserialize;
 use std::net::SocketAddr;
-use tower::ServiceBuilder;
-use tower_http::trace::TraceLayer;
 
 use crate::backend::onnx::infer_onnx_model;
 
@@ -20,23 +19,9 @@ struct InferenceRequest {
 }
 
 async fn handle_inference(Json(info): Json<InferenceRequest>) -> impl IntoResponse {
-    let model_type = &info.model_type;
-    let model_path = &info.model_path;
-    let input_data = &info.input_data;
+    let output = infer_onnx_model().await;
 
-    match model_type.as_str() {
-        "onnx" => {
-            let output = infer_onnx_model(model_path, input_data.to_owned()).await;
-            // Handle the result and return the appropriate response
-        }
-        // Implement other model types similarly
-        _ => (StatusCode::BAD_REQUEST, "Invalid model type"),
-    }
-}
-
-// basic handler that responds with a static string
-async fn root() -> &'static str {
-    "Hello, World!"
+    (StatusCode::OK, "Hello World!")
 }
 
 #[tokio::main]
