@@ -41,7 +41,12 @@ async fn handle_inference(
     Extension(models): Extension<Arc<HashMap<String, String>>>,
     Json(info): Json<InferenceRequest>,
 ) -> impl IntoResponse {
-    println!("Inference: {:?}", models);
+    let model_name = &info.model_name;
+    let input_data = &info.input_data;
+
+    println!("Inference for model: {:?}", model_name);
+    println!("Input data: {:?}", input_data);
+    println!("Models: {:?}", models);
 
     let output = infer_onnx_model().await;
 
