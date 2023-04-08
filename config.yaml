@@ -1,3 +1,3 @@
 models:
   - name: "squeezenet"
-    path: "./squeezenet1.0.1.onnx"
+    path: "squeezenet1.0-8.onnx"

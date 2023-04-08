@@ -2,6 +2,20 @@
 
 A rust based service for serving machine learning predictions
 
+## Install `onnxruntime`
+
+On MacOS:
+
+```shell
+brew install onnxruntime
+```
+
+Export the lib path:
+
+```shell
+export ONNX_RUNTIME_LIB_DIR=$(brew --prefix onnxruntime)/lib
+```
+
 ## Testing
 
 Start the service

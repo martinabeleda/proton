@@ -1,5 +1,6 @@
 pub mod backend;
 
+use std::env::var;
 use axum::extract::Extension;
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
@@ -12,7 +13,6 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::fs;
 use onnxruntime::environment::Environment;
-use onnxruntime::session::Session;
 use onnxruntime::{GraphOptimizationLevel, LoggingLevel};
 
 use crate::backend::onnx::infer_onnx_model;
@@ -54,22 +54,8 @@ async fn load_config() -> Result<Config, Box<dyn Error>> {
     Ok(config)
 }
 
-async fn load_models(config: &Config) -> Result<Session, Box<dyn Error>> {
-    // For now, let's just load the first model in the config
-    let model_config = config.models[0].clone();
-
-    let mut session = &ENVIRONMENT
-        .new_session_builder()?
-        .with_optimization_level(GraphOptimizationLevel::Basic)?
-        .with_number_threads(1)?
-        .with_model_from_file(&config.models[0].path)
-        .unwrap();
-
-    Ok(session)
-}
-
 async fn handle_inference(
-    Extension(models): Extension<Arc<Session>>,
+    Extension(models): Extension<Arc<HashMap<String, String>>>,
     Json(info): Json<InferenceRequest>,
 ) -> impl IntoResponse {
     let model_name = &info.model_name;
@@ -79,7 +65,7 @@ async fn handle_inference(
     println!("Input data: {:?}", input_data);
     println!("Models: {:?}", models);
 
-    let output = infer_onnx_model().await;
+    let _output = infer_onnx_model().await;
 
     (StatusCode::OK, "Hello World!")
 }
@@ -89,16 +75,30 @@ async fn main() {
     let config = load_config().await.unwrap();
     println!("Loaded config: {:?}", config);
 
-    // Initialize the ONNX environment and sessions
-    // For now, we just load the first model in the config
-    // but in the future, we'll load all of the models
-    let models = load_models(&config).await.unwrap();
+    let models: HashMap<String, String> = config
+        .models
+        .clone()
+        .into_iter()
+        .map(|model_config| (model_config.name, model_config.path))
+        .collect();
 
-    let shared_state = Arc::new(models);
+    let models = Arc::new(models);
+
+    let path = var("ONNX_RUNTIME_LIB_DIR").ok();
+
+    let _session = &ENVIRONMENT
+        .new_session_builder()
+        .unwrap()
+        .with_optimization_level(GraphOptimizationLevel::Basic)
+        .unwrap()
+        .with_number_threads(1)
+        .unwrap()
+        .with_model_from_file(&config.models[0].path)
+        .unwrap();
 
     let app = Router::new()
         .route("/infer", post(handle_inference))
-        .layer(Extension(shared_state));
+        .layer(Extension(models));
 
     let addr = SocketAddr::from(([127, 0, 0, 1], 8080));
 
