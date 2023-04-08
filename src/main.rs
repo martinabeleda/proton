@@ -1,27 +1,25 @@
 pub mod backend;
 
-use std::env::var;
 use axum::extract::Extension;
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
 use axum::routing::post;
 use axum::{Json, Router};
+use onnxruntime::environment::Environment;
+use onnxruntime::{GraphOptimizationLevel, LoggingLevel};
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::error::Error;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::fs;
-use onnxruntime::environment::Environment;
-use onnxruntime::{GraphOptimizationLevel, LoggingLevel};
 
 use crate::backend::onnx::infer_onnx_model;
 
 #[macro_use]
 extern crate lazy_static;
 
-
-lazy_static!{
+lazy_static! {
     pub static ref ENVIRONMENT: Arc<Environment> = Arc::new(
         Environment::builder()
             .with_name("onnx proton")
@@ -84,8 +82,8 @@ async fn main() {
 
     let models = Arc::new(models);
 
-    let path = var("ONNX_RUNTIME_LIB_DIR").ok();
-
+    // Load the onnx session. For now, we'll just load the first model in the config
+    // but in the future, we'll want the ability to load multiple models
     let _session = &ENVIRONMENT
         .new_session_builder()
         .unwrap()
