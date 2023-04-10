@@ -7,29 +7,26 @@ use axum::http::StatusCode;
 use axum::response::IntoResponse;
 use axum::routing::post;
 use axum::{Json, Router};
+use ndarray::Array4;
 use serde::Deserialize;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::sync::{mpsc, oneshot};
 use tokio::task::LocalSet;
 
-pub mod backend;
 pub mod config;
 pub mod worker;
 
 #[derive(Deserialize)]
 struct InferenceRequest {
     model_name: String,
-    input_data: Vec<f32>,
+    input_data: Array4<f32>,
 }
 
 async fn handle_inference(
     Extension(requests_tx): Extension<Arc<mpsc::Sender<worker::Message>>>,
     Json(request): Json<InferenceRequest>,
 ) -> impl IntoResponse {
-    tracing::info!("Inference for model: {:?}", &request.model_name);
-    tracing::info!("Input data: {:?}", &request.input_data);
-
     // Create a channel to receive the inference result
     let (response_tx, response_rx) = oneshot::channel();
 
@@ -39,12 +36,7 @@ async fn handle_inference(
         response_tx,
     };
 
-    tracing::info!("Handler sending message: {:#?}", request);
-
-    if let Err(err) = requests_tx.send(request).await {
-        panic!("Error sending request to worker: {:?}", err);
-    }
-
+    requests_tx.send(request).await.unwrap();
     let response = response_rx.await.unwrap();
 
     tracing::info!("Handler received prediction: {:?}", response);
@@ -53,18 +45,17 @@ async fn handle_inference(
 }
 
 async fn run_server(config: ServerConfig, requests_tx: mpsc::Sender<worker::Message>) {
-    tracing::info!("Starting server");
     let app = Router::new()
         .route("/predict", post(handle_inference))
         .layer(Extension(Arc::new(requests_tx)));
 
     let addr = SocketAddr::from(([127, 0, 0, 1], config.port));
+    tracing::info!("Starting server, binding to port {:?}", config.port);
 
     axum::Server::bind(&addr)
         .serve(app.into_make_service())
         .await
         .unwrap();
-    tracing::info!("Server started, bound to port {:?}", config.port);
 }
 
 #[tokio::main]

@@ -1,9 +1,11 @@
+use ndarray::Array4;
 use onnxruntime::environment::Environment;
+use onnxruntime::session::Session;
+use onnxruntime::tensor::OrtOwnedTensor;
 use onnxruntime::{GraphOptimizationLevel, LoggingLevel};
 use std::sync::Arc;
 use tokio::sync::{mpsc, oneshot};
 
-use crate::backend::onnx;
 use crate::config::ModelConfig;
 
 lazy_static! {
@@ -19,8 +21,8 @@ lazy_static! {
 #[derive(Debug)]
 pub struct Message {
     pub model_name: String,
-    pub input_data: Vec<f32>,
-    pub response_tx: oneshot::Sender<Option<Vec<f32>>>,
+    pub input_data: Array4<f32>,
+    pub response_tx: oneshot::Sender<Vec<f32>>,
 }
 
 pub struct InferenceWorker {
@@ -53,10 +55,27 @@ impl InferenceWorker {
     }
 
     pub async fn run(&self, mut requests_rx: mpsc::Receiver<Message>) {
+        let mut session = self.init_session();
+
+        // Run the worker loop
+        loop {
+            let request = requests_rx.recv().await.unwrap();
+            tracing::debug!("InferenceWorker received request {:?}", request);
+
+            let outputs = session.run(vec![request.input_data]).unwrap();
+            let output: &OrtOwnedTensor<f32, _> = &outputs[0];
+            tracing::info!("Model output: {:?}", output);
+
+            // Send the prediction back to the handler
+            let _ = request.response_tx.send(vec![1.1, 2.3, 4.1]);
+        }
+    }
+
+    fn init_session(&self) -> Session {
         // Load the onnx model and create a session. For now, we'll just
         // load the first model in the config but in the future, we'll want
         // the ability to load multiple models.
-        let session = &ENVIRONMENT
+        let session = ENVIRONMENT
             .new_session_builder()
             .unwrap()
             .with_optimization_level(GraphOptimizationLevel::Basic)
@@ -66,7 +85,7 @@ impl InferenceWorker {
             .with_model_from_file(&self.config.path)
             .unwrap();
 
-        tracing::info!("Created onnx session {:?}", session);
+        tracing::info!("Created onnx session {:?}", &session);
 
         let input0_shape: Vec<usize> = session.inputs[0]
             .dimensions()
@@ -83,18 +102,6 @@ impl InferenceWorker {
             output0_shape
         );
 
-        // Run the worker loop
-        loop {
-            if let Some(request) = requests_rx.recv().await {
-                tracing::info!("InferenceWorker received request {:?}", request);
-                // Run inference using the onnx session
-                let result = onnx::infer_onnx_model();
-
-                // Send the prediction back to the handler
-                let _ = request.response_tx.send(result);
-            } else {
-                tracing::info!("InferenceWorker error receiving request");
-            }
-        }
+        session
     }
 }

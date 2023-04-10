@@ -29,7 +29,7 @@ curl -LO "https://github.com/onnx/models/raw/main/vision/classification/squeezen
 Start the service
 
 ```shell
-cargo run
+cargo run --bin server
 ```
 
 Make a prediction
