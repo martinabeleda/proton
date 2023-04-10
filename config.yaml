@@ -1,3 +1,7 @@
+server:
+  buffer_size: 32
+  port: 8080
+
 models:
   - name: "squeezenet"
     path: "squeezenet1.0-8.onnx"

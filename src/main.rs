@@ -13,7 +13,9 @@ use std::error::Error;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::fs;
+use tokio::task::LocalSet;
 use tokio::sync::{mpsc, oneshot};
+use tracing::{info, instrument};
 
 use crate::backend::onnx::infer_onnx_model;
 
@@ -24,8 +26,15 @@ struct ModelConfig {
 }
 
 #[derive(Clone, Debug, Deserialize)]
+struct ServerConfig {
+    buffer_size: usize,
+    port: u16,
+}
+
+#[derive(Clone, Debug, Deserialize)]
 struct Config {
     models: Vec<ModelConfig>,
+    server: ServerConfig,
 }
 
 #[derive(Deserialize)]
@@ -64,14 +73,13 @@ struct InferenceWorker {
 /// ```
 ///
 impl InferenceWorker {
-    async fn new(config: &ModelConfig) -> Self {
+    fn new(config: &ModelConfig) -> Self {
         Self {
             config: config.clone(),
         }
     }
 
     async fn run(&self, mut requests_rx: mpsc::Receiver<InferenceMessage>) {
-
         let environment = Environment::builder()
             .with_name("onnx proton")
             .with_log_level(LoggingLevel::Warning)
@@ -81,7 +89,7 @@ impl InferenceWorker {
         // Load the onnx model and create a session. For now, we'll just 
         // load the first model in the config but in the future, we'll want 
         // the ability to load multiple models.
-        let _session = &environment
+        let session = &environment
             .new_session_builder()
             .unwrap()
             .with_optimization_level(GraphOptimizationLevel::Basic)
@@ -91,14 +99,30 @@ impl InferenceWorker {
             .with_model_from_file(&self.config.path)
             .unwrap();
 
+        info!("Created onnx session {:?}", session);
+
+        let input0_shape: Vec<usize> = session.inputs[0]
+            .dimensions()
+            .map(std::option::Option::unwrap)
+            .collect();
+        let output0_shape: Vec<usize> = session.outputs[0]
+            .dimensions()
+            .map(std::option::Option::unwrap)
+            .collect();
+
+        info!("InferenceWorker created model with input shape: {:?} and output shape {:?}", input0_shape, output0_shape);
+
         // Run the worker loop
         loop {
             if let Some(request) = requests_rx.recv().await {
+                info!("InferenceWorker received request {:?}", request);
                 // Run inference using the onnx session
-                let result = infer_onnx_model().await;
+                let result = infer_onnx_model();
 
                 // Send the prediction back to the handler
                 let _ = request.response_tx.send(result);
+            } else {
+                info!("InferenceWorker error receiving request");
             }
         }
     }
@@ -112,12 +136,10 @@ async fn load_config() -> Result<Config, Box<dyn Error>> {
 
 async fn handle_inference(
     Extension(requests_tx): Extension<Arc<mpsc::Sender<InferenceMessage>>>,
-    Extension(models): Extension<Arc<HashMap<String, String>>>,
     Json(request): Json<InferenceRequest>,
 ) -> impl IntoResponse {
-    println!("Inference for model: {:?}", &request.model_name);
-    println!("Input data: {:?}", &request.input_data);
-    println!("Models: {:?}", models);
+    info!("Inference for model: {:?}", &request.model_name);
+    info!("Input data: {:?}", &request.input_data);
 
     // Create a channel to receive the inference result
     let (response_tx, response_rx) = oneshot::channel();
@@ -128,52 +150,52 @@ async fn handle_inference(
         response_tx,
     };
 
+    info!("Handler sending message: {:#?}", request);
+
     if let Err(err) = requests_tx.send(request).await {
         panic!("Error sending request to worker: {:?}", err);
     }
 
-    let response = response_rx.await;
+    info!("Awaiting response");
+    let response = response_rx.await.unwrap();
 
-    println!("Handler received prediction: {:?}", response);
+    info!("Handler received prediction: {:?}", response);
 
     (StatusCode::OK, "Hello World!")
 }
 
 #[tokio::main]
 async fn main() {
+    // Set up loggging
+    tracing_subscriber::fmt::init();
+
     let config = load_config().await.unwrap();
-    println!("Loaded config: {:?}", config);
-
-    let models: HashMap<String, String> = config
-        .models
-        .clone()
-        .into_iter()
-        .map(|model_config| (model_config.name, model_config.path))
-        .collect();
-
-    let models = Arc::new(models);
+    info!("Loaded config: {:#?}", config);
 
     // Create a channel for the inference worker to listen for inference
     // requests on
-    let (requests_tx, requests_rx) = mpsc::channel::<InferenceMessage>(32);
+    let (requests_tx, requests_rx) = mpsc::channel::<InferenceMessage>(config.server.buffer_size);
 
+    info!("Creating InferenceWorker");
+    let worker = Arc::new(InferenceWorker::new(&config.models[0]));
 
-    let worker_task = tokio::spawn(async move {
-        let worker = InferenceWorker::new(&config.models[0].clone()).await;
+    // Spawn the inference worker task in the current thread since it is not Send
+    let local = LocalSet::new();
+    local.spawn_local(async move {
         worker.run(requests_rx).await;
     });
+    info!("Spawned LocalSet");
 
     let app = Router::new()
         .route("/predict", post(handle_inference))
-        .layer(Extension(Arc::new(requests_tx)))
-        .layer(Extension(models));
+        .layer(Extension(Arc::new(requests_tx)));
 
-    let addr = SocketAddr::from(([127, 0, 0, 1], 8080));
+    let addr = SocketAddr::from(([127, 0, 0, 1], config.server.port));
 
     axum::Server::bind(&addr)
         .serve(app.into_make_service())
         .await
         .unwrap();
 
-    worker_task.await.unwrap();
+    local.await;
 }
