@@ -1,6 +1,7 @@
 # proton
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+![main workflow](https://github.com/martinabeleda/proton/actions/workflows/rust.yml/badge.svg)
 
 A rust based service for serving machine learning predictions.
 
