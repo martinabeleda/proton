@@ -5,7 +5,12 @@ use serde::{Deserialize, Serialize};
 #[derive(Serialize, Deserialize, Debug)]
 struct InferenceRequest {
     model_name: String,
-    input_data: Array4<f32>,
+    data: Array4<f32>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct InferenceResponse {
+    data: Vec<f32>,
 }
 
 #[tokio::main]
@@ -30,7 +35,7 @@ async fn main() {
     let model_name = "squeezenet";
     let data = InferenceRequest {
         model_name: model_name.to_string(),
-        input_data: array,
+        data: array,
     };
 
     let client = Client::new();
@@ -43,10 +48,13 @@ async fn main() {
 
     match response.status() {
         StatusCode::OK => {
-            tracing::info!("Result: {:?}", response);
+            match response.json::<InferenceResponse>().await {
+                Ok(parsed) => tracing::info!("Success {:?}", parsed),
+                Err(_) => tracing::error!("The response didn't match InferenceResponse"),
+            };
         }
         _ => {
-            tracing::error!("Something went wrong");
+            tracing::error!("Something went wrong {:?}", response);
         }
     }
 }

@@ -66,8 +66,14 @@ impl InferenceWorker {
             let output: &OrtOwnedTensor<f32, _> = &outputs[0];
             tracing::info!("Model output: {:?}", output);
 
+            let probabilities: Vec<f32> = output
+                .softmax(ndarray::Axis(1))
+                .iter()
+                .copied()
+                .collect::<Vec<f32>>();
+
             // Send the prediction back to the handler
-            let _ = request.response_tx.send(vec![1.1, 2.3, 4.1]);
+            let _ = request.response_tx.send(probabilities);
         }
     }
 

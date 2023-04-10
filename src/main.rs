@@ -3,12 +3,11 @@ extern crate lazy_static;
 
 use crate::config::{Config, ServerConfig};
 use axum::extract::Extension;
-use axum::http::StatusCode;
 use axum::response::IntoResponse;
 use axum::routing::post;
 use axum::{Json, Router};
 use ndarray::Array4;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::sync::{mpsc, oneshot};
@@ -17,10 +16,15 @@ use tokio::task::LocalSet;
 pub mod config;
 pub mod worker;
 
-#[derive(Deserialize)]
+#[derive(Serialize, Deserialize)]
 struct InferenceRequest {
     model_name: String,
-    input_data: Array4<f32>,
+    data: Array4<f32>,
+}
+
+#[derive(Serialize, Deserialize)]
+struct InferenceResponse {
+    data: Vec<f32>,
 }
 
 async fn handle_inference(
@@ -32,7 +36,7 @@ async fn handle_inference(
 
     let request = worker::Message {
         model_name: request.model_name,
-        input_data: request.input_data,
+        input_data: request.data,
         response_tx,
     };
 
@@ -41,7 +45,7 @@ async fn handle_inference(
 
     tracing::info!("Handler received prediction: {:?}", response);
 
-    (StatusCode::OK, "Hello World!")
+    Json(InferenceResponse { data: response })
 }
 
 async fn run_server(config: ServerConfig, requests_tx: mpsc::Sender<worker::Message>) {
