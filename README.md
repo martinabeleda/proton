@@ -20,6 +20,12 @@ export ONNX_RUNTIME_LIB_DIR=$(brew --prefix onnxruntime)
 
 ## Testing
 
+Download the test model:
+
+```shell
+curl -LO "https://github.com/onnx/models/raw/main/vision/classification/squeezenet/model/squeezenet1.0-8.onnx"
+```
+
 Start the service
 
 ```shell
