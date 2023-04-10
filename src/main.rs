@@ -39,14 +39,14 @@ async fn handle_inference(
     // Generate a prediction_id for this request
     let prediction_id = Uuid::new_v4();
 
-    let request = worker::Message {
-        prediction_id: prediction_id,
+    let message = worker::Message {
+        prediction_id,
         model_name: request.model_name,
         input_data: request.data,
         response_tx,
     };
 
-    requests_tx.send(request).await.unwrap();
+    requests_tx.send(message).await.unwrap();
     let response = response_rx.await.unwrap();
 
     tracing::info!("Handler received prediction_id={:?}", prediction_id);
