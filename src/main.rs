@@ -17,6 +17,19 @@ use tokio::task::LocalSet;
 
 use crate::backend::onnx::infer_onnx_model;
 
+#[macro_use]
+extern crate lazy_static;
+
+lazy_static! {
+    pub static ref ENVIRONMENT: Arc<Environment> = Arc::new(
+        Environment::builder()
+            .with_name("onnx proton")
+            .with_log_level(LoggingLevel::Warning)
+            .build()
+            .unwrap()
+    );
+}
+
 #[derive(Clone, Debug, Deserialize)]
 struct ModelConfig {
     name: String,
@@ -78,16 +91,10 @@ impl InferenceWorker {
     }
 
     async fn run(&self, mut requests_rx: mpsc::Receiver<InferenceMessage>) {
-        let environment = Environment::builder()
-            .with_name("onnx proton")
-            .with_log_level(LoggingLevel::Warning)
-            .build()
-            .unwrap();
-
         // Load the onnx model and create a session. For now, we'll just
         // load the first model in the config but in the future, we'll want
         // the ability to load multiple models.
-        let session = &environment
+        let session = &ENVIRONMENT
             .new_session_builder()
             .unwrap()
             .with_optimization_level(GraphOptimizationLevel::Basic)
@@ -158,7 +165,6 @@ async fn handle_inference(
         panic!("Error sending request to worker: {:?}", err);
     }
 
-    tracing::info!("Awaiting response");
     let response = response_rx.await.unwrap();
 
     tracing::info!("Handler received prediction: {:?}", response);
