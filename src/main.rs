@@ -12,6 +12,7 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::sync::{mpsc, oneshot};
 use tokio::task::LocalSet;
+use uuid::Uuid;
 
 pub mod config;
 pub mod worker;
@@ -24,6 +25,7 @@ struct InferenceRequest {
 
 #[derive(Serialize, Deserialize)]
 struct InferenceResponse {
+    prediction_id: Uuid,
     data: Vec<f32>,
 }
 
@@ -34,7 +36,11 @@ async fn handle_inference(
     // Create a channel to receive the inference result
     let (response_tx, response_rx) = oneshot::channel();
 
+    // Generate a prediction_id for this request
+    let prediction_id = Uuid::new_v4();
+
     let request = worker::Message {
+        prediction_id: prediction_id,
         model_name: request.model_name,
         input_data: request.data,
         response_tx,
@@ -43,9 +49,12 @@ async fn handle_inference(
     requests_tx.send(request).await.unwrap();
     let response = response_rx.await.unwrap();
 
-    tracing::info!("Handler received prediction: {:?}", response);
+    tracing::info!("Handler received prediction_id={:?}", prediction_id);
 
-    Json(InferenceResponse { data: response })
+    Json(InferenceResponse {
+        prediction_id,
+        data: response,
+    })
 }
 
 async fn run_server(config: ServerConfig, requests_tx: mpsc::Sender<worker::Message>) {

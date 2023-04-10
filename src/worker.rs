@@ -5,6 +5,7 @@ use onnxruntime::tensor::OrtOwnedTensor;
 use onnxruntime::{GraphOptimizationLevel, LoggingLevel};
 use std::sync::Arc;
 use tokio::sync::{mpsc, oneshot};
+use uuid::Uuid;
 
 use crate::config::ModelConfig;
 
@@ -20,6 +21,7 @@ lazy_static! {
 
 #[derive(Debug)]
 pub struct Message {
+    pub prediction_id: Uuid,
     pub model_name: String,
     pub input_data: Array4<f32>,
     pub response_tx: oneshot::Sender<Vec<f32>>,
@@ -60,11 +62,10 @@ impl InferenceWorker {
         // Run the worker loop
         loop {
             let request = requests_rx.recv().await.unwrap();
-            tracing::debug!("InferenceWorker received request {:?}", request);
+            tracing::info!("Got prediction_id={:?}", request.prediction_id);
 
             let outputs = session.run(vec![request.input_data]).unwrap();
             let output: &OrtOwnedTensor<f32, _> = &outputs[0];
-            tracing::info!("Model output: {:?}", output);
 
             let probabilities: Vec<f32> = output
                 .softmax(ndarray::Axis(1))
@@ -74,6 +75,7 @@ impl InferenceWorker {
 
             // Send the prediction back to the handler
             let _ = request.response_tx.send(probabilities);
+            tracing::info!("Sent prediction_id={:?}", request.prediction_id);
         }
     }
 
@@ -93,19 +95,19 @@ impl InferenceWorker {
 
         tracing::info!("Created onnx session {:?}", &session);
 
-        let input0_shape: Vec<usize> = session.inputs[0]
+        let input_shape: Vec<usize> = session.inputs[0]
             .dimensions()
             .map(std::option::Option::unwrap)
             .collect();
-        let output0_shape: Vec<usize> = session.outputs[0]
+        let output_shape: Vec<usize> = session.outputs[0]
             .dimensions()
             .map(std::option::Option::unwrap)
             .collect();
 
         tracing::info!(
             "InferenceWorker created model with input shape: {:?} and output shape {:?}",
-            input0_shape,
-            output0_shape
+            input_shape,
+            output_shape
         );
 
         session

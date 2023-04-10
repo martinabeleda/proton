@@ -1,6 +1,7 @@
 use ndarray::{Array, Array4};
 use reqwest::{Client, StatusCode};
 use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 
 #[derive(Serialize, Deserialize, Debug)]
 struct InferenceRequest {
@@ -8,8 +9,9 @@ struct InferenceRequest {
     data: Array4<f32>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 struct InferenceResponse {
+    prediction_id: Uuid,
     data: Vec<f32>,
 }
 
