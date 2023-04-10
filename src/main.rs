@@ -8,10 +8,8 @@ use axum::response::IntoResponse;
 use axum::routing::post;
 use axum::{Json, Router};
 use serde::Deserialize;
-use std::error::Error;
 use std::net::SocketAddr;
 use std::sync::Arc;
-use tokio::fs;
 use tokio::sync::{mpsc, oneshot};
 use tokio::task::LocalSet;
 
@@ -23,12 +21,6 @@ pub mod worker;
 struct InferenceRequest {
     model_name: String,
     input_data: Vec<f32>,
-}
-
-async fn load_config() -> Result<Config, Box<dyn Error>> {
-    let config_data = fs::read_to_string("config.yaml").await?;
-    let config: Config = serde_yaml::from_str(&config_data)?;
-    Ok(config)
 }
 
 async fn handle_inference(
@@ -84,7 +76,7 @@ async fn main() {
         .with_line_number(true)
         .init();
 
-    let config = load_config().await.unwrap();
+    let config = Config::load("config.yaml").await.unwrap();
     tracing::info!("Loaded config: {:#?}", config);
 
     // Create a channel for the inference worker to listen for inference
