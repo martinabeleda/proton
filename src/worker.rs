@@ -38,16 +38,6 @@ pub struct InferenceWorker {
 /// checks if the requested model name matches its own. If so, it runs the inference and sends the result
 /// back to the request sender through a one-shot channel.
 ///
-/// # Example
-///
-/// ```
-/// let worker = InferenceWorker::new(&config).await;
-///
-/// let (requests_tx, requests_rx) = mpsc::channel::<ChannelInferenceRequest>(32);
-///
-/// tokio::spawn(worker.run(requests_rx));
-/// ```
-///
 impl InferenceWorker {
     pub fn new(config: &Config) -> Self {
         Self {
