@@ -58,7 +58,7 @@ async fn main() {
         .into_shape(input_shape)
         .unwrap();
 
-    tracing::info!("Input array: {:?}", array);
+    tracing::info!("Input array: {:?}", array.shape());
 
     let model_name = "squeezenet";
     let data = InferenceRequest {
