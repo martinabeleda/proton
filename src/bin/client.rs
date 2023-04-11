@@ -1,21 +1,8 @@
-use ndarray::{Array, Array4};
+use ndarray::Array;
+use proton::predict::{InferenceRequest, InferenceResponse};
 use reqwest::{Client, StatusCode};
-use serde::{Deserialize, Serialize};
 use std::time::Duration;
 use tokio::task::JoinHandle;
-use uuid::Uuid;
-
-#[derive(Clone, Serialize, Deserialize, Debug)]
-struct InferenceRequest {
-    model_name: String,
-    data: Array4<f32>,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-struct InferenceResponse {
-    prediction_id: Uuid,
-    data: Vec<f32>,
-}
 
 async fn send_request(client: &Client, data: &InferenceRequest) -> Duration {
     let start_time = tokio::time::Instant::now();
