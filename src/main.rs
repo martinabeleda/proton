@@ -6,6 +6,7 @@ use axum::extract::Extension;
 use axum::response::IntoResponse;
 use axum::routing::post;
 use axum::{Json, Router};
+use core::time::Duration;
 use ndarray::Array4;
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
@@ -46,7 +47,10 @@ async fn handle_inference(
         response_tx,
     };
 
-    requests_tx.send(message).await.unwrap();
+    requests_tx
+        .send_timeout(message, Duration::new(5, 0))
+        .await
+        .unwrap();
     let response = response_rx.await.unwrap();
 
     tracing::info!("Handler received prediction_id={:?}", prediction_id);
@@ -88,7 +92,7 @@ async fn main() {
     let (requests_tx, requests_rx) = mpsc::channel::<worker::Message>(config.server.buffer_size);
 
     tracing::info!("Creating InferenceWorker");
-    let inference_worker = Arc::new(worker::InferenceWorker::new(&config.models[0]));
+    let inference_worker = Arc::new(worker::InferenceWorker::new(&config));
 
     // Spawn the inference worker task in the current thread since it is not Send
     let local = LocalSet::new();

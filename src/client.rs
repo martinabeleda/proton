@@ -68,9 +68,10 @@ async fn main() {
 
     let client = Client::new();
 
-    let num_requests = 100; // number of concurrent requests
+    let num_requests = 50; // number of concurrent requests
     let mut tasks: Vec<JoinHandle<Duration>> = Vec::with_capacity(num_requests);
 
+    let start_time = tokio::time::Instant::now();
     for _ in 0..num_requests {
         let data = data.clone();
         let client = client.clone();
@@ -83,6 +84,7 @@ async fn main() {
         elapsed_times.push(task.await.unwrap());
     }
 
+    let total_time = start_time.elapsed();
     elapsed_times.sort_unstable();
 
     let sum = elapsed_times.iter().cloned().sum::<Duration>();
@@ -93,6 +95,7 @@ async fn main() {
     let p95 = elapsed_times[((0.95 * (num_requests as f64)).round() as usize) - 1];
     let p99 = elapsed_times[((0.99 * (num_requests as f64)).round() as usize) - 1];
 
+    tracing::info!("Total time: {:?}", total_time);
     tracing::info!("Average time: {:?}", average);
     tracing::info!("p95 time: {:?}", p95);
     tracing::info!("p99 time: {:?}", p99);

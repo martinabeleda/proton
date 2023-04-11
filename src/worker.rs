@@ -7,7 +7,7 @@ use std::sync::Arc;
 use tokio::sync::{mpsc, oneshot};
 use uuid::Uuid;
 
-use crate::config::ModelConfig;
+use crate::config::Config;
 
 lazy_static! {
     pub static ref ENVIRONMENT: Arc<Environment> = Arc::new(
@@ -28,7 +28,7 @@ pub struct Message {
 }
 
 pub struct InferenceWorker {
-    pub config: ModelConfig,
+    pub config: Config,
 }
 
 /// `InferenceWorker` is responsible for running inference on a specific ONNX model.
@@ -41,8 +41,7 @@ pub struct InferenceWorker {
 /// # Example
 ///
 /// ```
-/// let model_config = &config.models[0];
-/// let worker = InferenceWorker::new(model_config.name.clone(), model_config.path.clone()).await;
+/// let worker = InferenceWorker::new(&config).await;
 ///
 /// let (requests_tx, requests_rx) = mpsc::channel::<ChannelInferenceRequest>(32);
 ///
@@ -50,7 +49,7 @@ pub struct InferenceWorker {
 /// ```
 ///
 impl InferenceWorker {
-    pub fn new(config: &ModelConfig) -> Self {
+    pub fn new(config: &Config) -> Self {
         Self {
             config: config.clone(),
         }
@@ -88,9 +87,9 @@ impl InferenceWorker {
             .unwrap()
             .with_optimization_level(GraphOptimizationLevel::Basic)
             .unwrap()
-            .with_number_threads(1)
+            .with_number_threads(self.config.server.num_threads)
             .unwrap()
-            .with_model_from_file(&self.config.path)
+            .with_model_from_file(&self.config.models[0].path)
             .unwrap();
 
         tracing::info!("Created onnx session {:?}", &session);

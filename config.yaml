@@ -1,5 +1,6 @@
 server:
-  buffer_size: 32
+  num_threads: 1
+  buffer_size: 64
   port: 8080
 
 models:

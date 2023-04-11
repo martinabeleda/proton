@@ -10,6 +10,7 @@ pub struct ModelConfig {
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct ServerConfig {
+    pub num_threads: i16,
     pub buffer_size: usize,
     pub port: u16,
 }
