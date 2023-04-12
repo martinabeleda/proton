@@ -5,6 +5,7 @@ use proton::config::{Config, ServerConfig};
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::sync::mpsc;
+use tokio::sync::Mutex;
 use tokio::task::LocalSet;
 
 use proton::predict::handle_inference;
@@ -41,12 +42,13 @@ async fn main() {
     let (requests_tx, requests_rx) = mpsc::channel::<Message>(config.server.buffer_size);
 
     tracing::info!("Creating InferenceWorker");
-    let inference_worker = Arc::new(InferenceWorker::new(&config));
+    let inference_worker = Arc::new(Mutex::new(InferenceWorker::new(&config)));
 
     // Spawn the inference worker task in the current thread since it is not Send
     let local = LocalSet::new();
     local.spawn_local(async move {
-        inference_worker.run(requests_rx).await;
+        let mut worker = inference_worker.lock().await;
+        worker.run(requests_rx).await;
     });
 
     let server_task = run_server(config.server, requests_tx);

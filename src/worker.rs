@@ -1,23 +1,10 @@
 use ndarray::Array4;
-use onnxruntime::environment::Environment;
-use onnxruntime::session::Session;
-use onnxruntime::tensor::OrtOwnedTensor;
-use onnxruntime::{GraphOptimizationLevel, LoggingLevel};
-use std::sync::Arc;
+use std::collections::HashMap;
 use tokio::sync::{mpsc, oneshot};
 use uuid::Uuid;
 
 use crate::config::Config;
-
-lazy_static! {
-    pub static ref ENVIRONMENT: Arc<Environment> = Arc::new(
-        Environment::builder()
-            .with_name("onnx_environment")
-            .with_log_level(LoggingLevel::Warning)
-            .build()
-            .unwrap()
-    );
-}
+use crate::model::Model;
 
 #[derive(Debug)]
 pub struct Message {
@@ -27,8 +14,9 @@ pub struct Message {
     pub response_tx: oneshot::Sender<Vec<f32>>,
 }
 
-pub struct InferenceWorker {
+pub struct InferenceWorker<'a> {
     pub config: Config,
+    models: HashMap<String, Model<'a>>,
 }
 
 /// `InferenceWorker` is responsible for running inference on a specific ONNX model.
@@ -38,67 +26,32 @@ pub struct InferenceWorker {
 /// checks if the requested model name matches its own. If so, it runs the inference and sends the result
 /// back to the request sender through a one-shot channel.
 ///
-impl InferenceWorker {
+impl InferenceWorker<'_> {
     pub fn new(config: &Config) -> Self {
+        let models = config
+            .models
+            .iter()
+            .map(|c| (c.name.clone(), Model::new(c)))
+            .collect::<HashMap<String, Model>>();
+
         Self {
             config: config.clone(),
+            models,
         }
     }
 
-    pub async fn run(&self, mut requests_rx: mpsc::Receiver<Message>) {
-        let mut session = self.init_session();
-
+    pub async fn run(&mut self, mut requests_rx: mpsc::Receiver<Message>) {
         // Run the worker loop
         loop {
             let request = requests_rx.recv().await.unwrap();
             tracing::info!("Got prediction_id={:?}", request.prediction_id);
 
-            let outputs = session.run(vec![request.input_data]).unwrap();
-            let output: &OrtOwnedTensor<f32, _> = &outputs[0];
-
-            let probabilities: Vec<f32> = output
-                .softmax(ndarray::Axis(1))
-                .iter()
-                .copied()
-                .collect::<Vec<f32>>();
+            let model = self.models.get_mut(&request.model_name).unwrap();
+            let output = model.predict(vec![request.input_data]);
 
             // Send the prediction back to the handler
-            let _ = request.response_tx.send(probabilities);
+            let _ = request.response_tx.send(output);
             tracing::info!("Sent prediction_id={:?}", request.prediction_id);
         }
-    }
-
-    fn init_session(&self) -> Session {
-        // Load the onnx model and create a session. For now, we'll just
-        // load the first model in the config but in the future, we'll want
-        // the ability to load multiple models.
-        let session = ENVIRONMENT
-            .new_session_builder()
-            .unwrap()
-            .with_optimization_level(GraphOptimizationLevel::Basic)
-            .unwrap()
-            .with_number_threads(self.config.server.num_threads)
-            .unwrap()
-            .with_model_from_file(&self.config.models[0].path)
-            .unwrap();
-
-        tracing::info!("Created onnx session {:?}", &session);
-
-        let input_shape: Vec<usize> = session.inputs[0]
-            .dimensions()
-            .map(std::option::Option::unwrap)
-            .collect();
-        let output_shape: Vec<usize> = session.outputs[0]
-            .dimensions()
-            .map(std::option::Option::unwrap)
-            .collect();
-
-        tracing::info!(
-            "InferenceWorker created model with input shape: {:?} and output shape {:?}",
-            input_shape,
-            output_shape
-        );
-
-        session
     }
 }
