@@ -48,6 +48,9 @@ async fn main() {
         queues_rx.insert(model_config.name.clone(), rx);
     }
 
+    // Create a local set to run the inference workers. We run a separate worker for each model
+    // so that models can process messages at different rates. We use a local set so that we can
+    // run the inference workers and the server concurrently.
     let local = LocalSet::new();
     for model_config in config.models.iter() {
         let model_name = model_config.name.clone();
