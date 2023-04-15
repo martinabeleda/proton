@@ -1,9 +1,8 @@
 use ndarray::Array4;
-use std::collections::HashMap;
 use tokio::sync::{mpsc, oneshot};
 use uuid::Uuid;
 
-use crate::config::Config;
+use crate::config::ModelConfig;
 use crate::model::Model;
 
 #[derive(Debug)]
@@ -15,8 +14,8 @@ pub struct Message {
 }
 
 pub struct InferenceWorker<'a> {
-    pub config: Config,
-    models: HashMap<String, Model<'a>>,
+    pub config: ModelConfig,
+    model: Model<'a>,
 }
 
 /// `InferenceWorker` is responsible for running inference on a specific ONNX model.
@@ -27,16 +26,11 @@ pub struct InferenceWorker<'a> {
 /// back to the request sender through a one-shot channel.
 ///
 impl InferenceWorker<'_> {
-    pub fn new(config: &Config) -> Self {
-        let models = config
-            .models
-            .iter()
-            .map(|c| (c.name.clone(), Model::new(c)))
-            .collect::<HashMap<String, Model>>();
-
+    pub fn new(config: &ModelConfig) -> Self {
+        let model = Model::new(config);
         Self {
             config: config.clone(),
-            models,
+            model,
         }
     }
 
@@ -46,8 +40,7 @@ impl InferenceWorker<'_> {
             let request = requests_rx.recv().await.unwrap();
             tracing::info!("Got prediction_id={:?}", request.prediction_id);
 
-            let model = self.models.get_mut(&request.model_name).unwrap();
-            let output = model.predict(vec![request.input_data]);
+            let output = self.model.predict(vec![request.input_data]);
 
             // Send the prediction back to the handler
             let _ = request.response_tx.send(output);

@@ -1,5 +1,6 @@
 use ndarray::Array;
 use proton::predict::{InferenceRequest, InferenceResponse};
+use rand::prelude::*;
 use reqwest::{Client, StatusCode};
 use std::time::Duration;
 use tokio::task::JoinHandle;
@@ -16,7 +17,11 @@ async fn send_request(client: &Client, data: &InferenceRequest) -> Duration {
     match response.status() {
         StatusCode::OK => {
             match response.json::<InferenceResponse>().await {
-                Ok(parsed) => tracing::info!("Success {:?}", parsed.prediction_id),
+                Ok(parsed) => tracing::info!(
+                    "Success for model {:?}, prediction_id: {:?}",
+                    parsed.model_name,
+                    parsed.prediction_id
+                ),
                 Err(_) => tracing::error!("The response didn't match InferenceResponse"),
             };
         }
@@ -47,28 +52,31 @@ async fn main() {
 
     tracing::info!("Input array: {:?}", array.shape());
 
-    let model_name = "squeezenet";
-    let data = InferenceRequest {
-        model_name: model_name.to_string(),
-        data: array,
-    };
+    let model_names = vec!["squeezenet", "squeezenet2"];
 
     let client = Client::new();
 
-    let num_requests = 50; // number of concurrent requests
-    let mut tasks: Vec<JoinHandle<Duration>> = Vec::with_capacity(num_requests);
+    let num_requests = 100; // number of concurrent requests
+    let mut futures: Vec<JoinHandle<Duration>> = Vec::with_capacity(num_requests);
+    let mut rng = thread_rng();
 
     let start_time = tokio::time::Instant::now();
     for _ in 0..num_requests {
-        let data = data.clone();
+        let model_name = model_names.choose(&mut rng).unwrap();
+        tracing::info!("Sending request for {:?}", model_name);
+        let data = InferenceRequest {
+            model_name: model_name.to_string(),
+            data: array.clone(),
+        };
+
         let client = client.clone();
         let task = tokio::spawn(async move { send_request(&client, &data).await });
-        tasks.push(task);
+        futures.push(task);
     }
 
     let mut elapsed_times = Vec::with_capacity(num_requests);
-    for task in tasks {
-        elapsed_times.push(task.await.unwrap());
+    for future in futures {
+        elapsed_times.push(future.await.unwrap());
     }
 
     let total_time = start_time.elapsed();
