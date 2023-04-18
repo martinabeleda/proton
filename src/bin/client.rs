@@ -17,7 +17,7 @@ async fn send_request(client: &Client, data: &InferenceRequest) -> Duration {
     match response.status() {
         StatusCode::OK => {
             match response.json::<InferenceResponse>().await {
-                Ok(parsed) => tracing::info!(
+                Ok(parsed) => tracing::debug!(
                     "Success for model {:?}, prediction_id: {:?}",
                     parsed.model_name,
                     parsed.prediction_id
@@ -63,7 +63,7 @@ async fn main() {
     let start_time = tokio::time::Instant::now();
     for _ in 0..num_requests {
         let model_name = model_names.choose(&mut rng).unwrap();
-        tracing::info!("Sending request for {:?}", model_name);
+        tracing::debug!("Sending request for {:?}", model_name);
         let data = InferenceRequest {
             model_name: model_name.to_string(),
             data: array.clone(),

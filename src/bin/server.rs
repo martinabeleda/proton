@@ -5,9 +5,8 @@ use proton::config::{Config, ServerConfig};
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::Arc;
+use std::thread;
 use tokio::sync::mpsc;
-use tokio::sync::Mutex;
-use tokio::task::LocalSet;
 
 use proton::predict::handle_inference;
 use proton::worker::{InferenceWorker, Message};
@@ -48,25 +47,23 @@ async fn main() {
         queues_rx.insert(model_config.name.clone(), rx);
     }
 
-    // Create a local set to run the inference workers. We run a separate worker for each model
-    // so that models can process messages at different rates. We use a local set so that we can
-    // run the inference workers and the server concurrently.
-    let local = LocalSet::new();
+    // Spawn threads to run our workers in the background. We communicate with the threads using
+    // the channels we created earlier. Each thread gets the receiving end and the sender sides
+    // are provided to the `handle_inference` function
     for model_config in config.models.iter() {
         let model_name = model_config.name.clone();
         tracing::info!("Creating InferenceWorker for {:?}", model_name);
 
         let requests_rx = queues_rx.remove(&model_name).unwrap();
-        let inference_worker = Arc::new(Mutex::new(InferenceWorker::new(&model_config)));
+        let mut worker = InferenceWorker::new(model_config.clone());
 
-        local.spawn_local(async move {
-            let mut worker = inference_worker.lock().await;
-            worker.run(requests_rx).await;
+        thread::spawn(move || {
+            worker.run(requests_rx);
         });
     }
 
     let server_task = run_server(config.server, queues_tx);
 
     // Run the worker and the server concurrently
-    tokio::join!(local, server_task);
+    tokio::join!(server_task);
 }

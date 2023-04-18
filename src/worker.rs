@@ -13,9 +13,8 @@ pub struct Message {
     pub response_tx: oneshot::Sender<Vec<f32>>,
 }
 
-pub struct InferenceWorker<'a> {
+pub struct InferenceWorker {
     pub config: ModelConfig,
-    model: Model<'a>,
 }
 
 /// `InferenceWorker` is responsible for running inference on a specific ONNX model.
@@ -25,22 +24,21 @@ pub struct InferenceWorker<'a> {
 /// checks if the requested model name matches its own. If so, it runs the inference and sends the result
 /// back to the request sender through a one-shot channel.
 ///
-impl InferenceWorker<'_> {
-    pub fn new(config: &ModelConfig) -> Self {
-        let model = Model::new(config);
-        Self {
-            config: config.clone(),
-            model,
-        }
+impl InferenceWorker {
+    pub fn new(config: ModelConfig) -> Self {
+        Self { config }
     }
 
-    pub async fn run(&mut self, mut requests_rx: mpsc::Receiver<Message>) {
+    pub fn run(&mut self, mut requests_rx: mpsc::Receiver<Message>) {
+        let mut model = Model::new(&self.config);
+
         // Run the worker loop
         loop {
-            let request = requests_rx.recv().await.unwrap();
+            let request = requests_rx.blocking_recv().unwrap();
+
             tracing::info!("Got prediction_id={:?}", request.prediction_id);
 
-            let output = self.model.predict(vec![request.input_data]);
+            let output = model.predict(vec![request.input_data]);
 
             // Send the prediction back to the handler
             let _ = request.response_tx.send(output);
