@@ -1,11 +1,70 @@
-use ndarray::Array;
+use ndarray::{Array, Dimension, IxDyn};
 use proton::predict::{InferenceRequest, InferenceResponse};
 use rand::prelude::*;
 use reqwest::{Client, StatusCode};
+use std::collections::HashMap;
 use std::time::Duration;
 use tokio::task::JoinHandle;
 
-async fn send_request(client: &Client, data: &InferenceRequest) -> Duration {
+trait Model {
+    fn dummy_data(&self) -> Array<f32, IxDyn>;
+
+    fn get_name(&self) -> String;
+}
+
+struct Squeezenet {
+    name: String,
+}
+
+impl Squeezenet {
+    fn new() -> Self {
+        Squeezenet {
+            name: "squeezenet".to_string(),
+        }
+    }
+}
+
+impl Model for Squeezenet {
+    fn dummy_data(&self) -> Array<f32, IxDyn> {
+        let input_shape = IxDyn(&[1, 3, 224, 224]);
+
+        Array::linspace(0.0_f32, 1.0, input_shape.size())
+            .into_shape(input_shape)
+            .unwrap()
+    }
+
+    fn get_name(&self) -> String {
+        self.name.clone()
+    }
+}
+
+struct MaskRCNN {
+    name: String,
+}
+
+impl MaskRCNN {
+    fn new() -> Self {
+        MaskRCNN {
+            name: "maskrcnn".to_string(),
+        }
+    }
+}
+
+impl Model for MaskRCNN {
+    fn dummy_data(&self) -> Array<f32, IxDyn> {
+        let input_shape = IxDyn(&[3, 224, 224]);
+
+        Array::linspace(0.0_f32, 1.0, input_shape.size())
+            .into_shape(input_shape)
+            .unwrap()
+    }
+
+    fn get_name(&self) -> String {
+        self.name.clone()
+    }
+}
+
+async fn send_request(client: &Client, data: &InferenceRequest) -> (String, Duration) {
     let start_time = tokio::time::Instant::now();
     let response = client
         .post("http://localhost:8080/predict")
@@ -17,7 +76,7 @@ async fn send_request(client: &Client, data: &InferenceRequest) -> Duration {
     match response.status() {
         StatusCode::OK => {
             match response.json::<InferenceResponse>().await {
-                Ok(parsed) => tracing::debug!(
+                Ok(parsed) => tracing::info!(
                     "Success for model {:?}, prediction_id: {:?}",
                     parsed.model_name,
                     parsed.prediction_id
@@ -30,7 +89,7 @@ async fn send_request(client: &Client, data: &InferenceRequest) -> Duration {
         }
     }
 
-    start_time.elapsed()
+    (data.model_name.clone(), start_time.elapsed())
 }
 
 #[tokio::main]
@@ -42,31 +101,22 @@ async fn main() {
         .with_line_number(true)
         .init();
 
-    let input_shape = (1, 3, 224, 224);
-
-    // Initialize input data with values in [0.0, 1.0]
-    let n = input_shape.0 * input_shape.1 * input_shape.2 * input_shape.3;
-    let array = Array::linspace(0.0_f32, 1.0, n as usize)
-        .into_shape(input_shape)
-        .unwrap();
-
-    tracing::info!("Input array: {:?}", array.shape());
-
-    let model_names = vec!["squeezenet", "squeezenet2"];
+    let mut models: Vec<Box<dyn Model>> = Vec::new();
+    models.push(Box::new(MaskRCNN::new()));
+    models.push(Box::new(Squeezenet::new()));
 
     let client = Client::new();
 
-    let num_requests = 100; // number of concurrent requests
-    let mut futures: Vec<JoinHandle<Duration>> = Vec::with_capacity(num_requests);
+    let num_requests = 50; // number of concurrent requests
+    let mut futures: Vec<JoinHandle<(String, Duration)>> = Vec::with_capacity(num_requests);
     let mut rng = thread_rng();
 
-    let start_time = tokio::time::Instant::now();
     for _ in 0..num_requests {
-        let model_name = model_names.choose(&mut rng).unwrap();
-        tracing::debug!("Sending request for {:?}", model_name);
+        let model = models.choose(&mut rng).unwrap();
+        tracing::info!("Sending request for {:?}", &model.get_name());
         let data = InferenceRequest {
-            model_name: model_name.to_string(),
-            data: array.clone(),
+            model_name: model.get_name(),
+            data: model.dummy_data(),
         };
 
         let client = client.clone();
@@ -74,24 +124,31 @@ async fn main() {
         futures.push(task);
     }
 
-    let mut elapsed_times = Vec::with_capacity(num_requests);
+    let mut elapsed_times: HashMap<String, Vec<Duration>> = HashMap::new();
+
     for future in futures {
-        elapsed_times.push(future.await.unwrap());
+        let (model_name, duration) = future.await.unwrap();
+        elapsed_times
+            .entry(model_name)
+            .or_insert_with(Vec::new)
+            .push(duration);
     }
 
-    let total_time = start_time.elapsed();
-    elapsed_times.sort_unstable();
+    for (model_name, times) in &elapsed_times {
+        let total_time: Duration = times.iter().cloned().sum();
+        let average_time = total_time / times.len() as u32;
+        let mut sorted_times = times.clone();
+        sorted_times.sort_unstable();
 
-    let sum = elapsed_times.iter().cloned().sum::<Duration>();
-    let average = sum / num_requests as u32;
+        let p50 = sorted_times[((0.50 * (times.len() as f64)).round() as usize) - 1];
+        let p95 = sorted_times[((0.95 * (times.len() as f64)).round() as usize) - 1];
+        let p99 = sorted_times[((0.99 * (times.len() as f64)).round() as usize) - 1];
 
-    tracing::info!("Elapsed times: {:?}", elapsed_times);
-
-    let p95 = elapsed_times[((0.95 * (num_requests as f64)).round() as usize) - 1];
-    let p99 = elapsed_times[((0.99 * (num_requests as f64)).round() as usize) - 1];
-
-    tracing::info!("Total time: {:?}", total_time);
-    tracing::info!("Average time: {:?}", average);
-    tracing::info!("p95 time: {:?}", p95);
-    tracing::info!("p99 time: {:?}", p99);
+        tracing::info!("\nModel: {:?}", model_name);
+        tracing::info!("Total time: {:?}", total_time);
+        tracing::info!("Average time: {:?}", average_time);
+        tracing::info!("Median time: {:?}", p50);
+        tracing::info!("p95 time: {:?}", p95);
+        tracing::info!("p99 time: {:?}", p99);
+    }
 }
