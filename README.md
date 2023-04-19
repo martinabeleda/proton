@@ -37,7 +37,7 @@ curl -LO "https://github.com/onnx/models/raw/main/vision/object_detection_segmen
 Start the service
 
 ```shell
-cargo run --bin server
+cargo run
 ```
 
 See the deployed models:
