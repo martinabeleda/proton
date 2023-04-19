@@ -1,7 +1,7 @@
 use axum::extract::Extension;
 use axum::response::IntoResponse;
 use axum::Json;
-use ndarray::Array4;
+use ndarray::{Array, IxDyn};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -13,14 +13,14 @@ use crate::worker::Message;
 #[derive(Clone, Serialize, Deserialize)]
 pub struct InferenceRequest {
     pub model_name: String,
-    pub data: Array4<f32>,
+    pub data: Array<f32, IxDyn>,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct InferenceResponse {
     pub prediction_id: Uuid,
     pub model_name: String,
-    pub data: Vec<f32>,
+    pub data: Array<f32, IxDyn>,
 }
 
 pub async fn handle_inference(

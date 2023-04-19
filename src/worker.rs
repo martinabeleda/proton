@@ -1,4 +1,4 @@
-use ndarray::Array4;
+use ndarray::{Array, IxDyn};
 use tokio::sync::{mpsc, oneshot};
 use uuid::Uuid;
 
@@ -9,8 +9,8 @@ use crate::model::Model;
 pub struct Message {
     pub prediction_id: Uuid,
     pub model_name: String,
-    pub input_data: Array4<f32>,
-    pub response_tx: oneshot::Sender<Vec<f32>>,
+    pub input_data: Array<f32, IxDyn>,
+    pub response_tx: oneshot::Sender<Array<f32, IxDyn>>,
 }
 
 pub struct InferenceWorker {

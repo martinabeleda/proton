@@ -6,9 +6,5 @@ server:
 models:
   - name: "squeezenet"
     path: "squeezenet1.0-8.onnx"
-  - name: "squeezenet2"
-    path: "squeezenet1.0-12.onnx"
-  # - name: "bertsquad"
-  #   path: "bertsquad-10.onnx"
-  # - name: "maskrcnn"
-  #   path: "MaskRCNN-10.onnx"
+  - name: "maskrcnn"
+    path: "MaskRCNN-10.onnx"

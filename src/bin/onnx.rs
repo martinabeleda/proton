@@ -2,7 +2,7 @@
 ///
 /// This script is used to test running an onnx session with a variety of
 /// models.
-#[allow(dead_code)]
+#[allow(dead_code, unused_variables)]
 use lazy_static::lazy_static;
 use ndarray::{Array, Dimension, IxDyn};
 use onnxruntime::tensor::OrtOwnedTensor;
