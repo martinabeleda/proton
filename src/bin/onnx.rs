@@ -1,11 +1,11 @@
-use ndarray::{ArrayView, Dim, IxDynImpl};
-use onnxruntime::{environment::Environment, ndarray::Array, GraphOptimizationLevel, LoggingLevel};
+use lazy_static::{__Deref, lazy_static};
+use ndarray::{Array, IxDyn};
 use onnxruntime::tensor::OrtOwnedTensor;
-use lazy_static::{lazy_static, __Deref};
+use onnxruntime::{environment::Environment, GraphOptimizationLevel, LoggingLevel};
+use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 use tracing::Level;
 use tracing_subscriber::FmtSubscriber;
-use std::sync::Arc;
-use serde::Serialize;
 
 lazy_static! {
     pub static ref ENVIRONMENT: Arc<Environment> = Arc::new(
@@ -17,9 +17,9 @@ lazy_static! {
     );
 }
 
-#[derive(Debug, Serialize)]
-struct Output<'a> {
-    data: ArrayView<'a, f32, Dim<IxDynImpl>>,
+#[derive(Debug, Deserialize, Serialize)]
+struct Output<A> {
+    data: Array<A, IxDyn>,
 }
 
 fn main() {
@@ -66,10 +66,11 @@ fn main() {
 
     let outputs: Vec<OrtOwnedTensor<f32, _>> = session.run(input_tensor_values).unwrap();
 
-    let output = Output{ data: outputs[0].deref().into() };
+    let output_data =
+        Array::from_shape_vec(outputs[0].shape(), outputs[0].iter().cloned().collect()).unwrap();
+    let output = Output { data: output_data };
 
     println!("output={:?}", output);
 
     println!("json={:?}", serde_json::to_string(&output).unwrap());
-
 }
