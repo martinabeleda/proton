@@ -1,5 +1,10 @@
-use lazy_static::{__Deref, lazy_static};
-use ndarray::{Array, IxDyn};
+/// Onnx test script
+///
+/// This script is used to test running an onnx session with a variety of
+/// models.
+#[allow(dead_code)]
+use lazy_static::lazy_static;
+use ndarray::{Array, Dimension, IxDyn};
 use onnxruntime::tensor::OrtOwnedTensor;
 use onnxruntime::{environment::Environment, GraphOptimizationLevel, LoggingLevel};
 use serde::{Deserialize, Serialize};
@@ -22,12 +27,67 @@ struct Output<A> {
     data: Array<A, IxDyn>,
 }
 
+trait Model {
+    fn dummy_data(&self) -> Array<f32, IxDyn>;
+}
+
+struct Squeezenet {
+    name: String,
+    file: String,
+}
+
+impl Squeezenet {
+    fn new() -> Self {
+        Squeezenet {
+            name: "squeezenet".to_string(),
+            file: "squeezenet1.0-8.onnx".to_string(),
+        }
+    }
+}
+
+impl Model for Squeezenet {
+    fn dummy_data(&self) -> Array<f32, IxDyn> {
+        let input_shape = IxDyn(&[1, 3, 224, 224]);
+
+        Array::linspace(0.0_f32, 1.0, input_shape.size())
+            .into_shape(input_shape)
+            .unwrap()
+    }
+}
+
+struct MaskRCNN {
+    name: String,
+    file: String,
+}
+
+impl MaskRCNN {
+    fn new() -> Self {
+        MaskRCNN {
+            name: "maskrcnn".to_string(),
+            file: "MaskRCNN-10.onnx".to_string(),
+        }
+    }
+}
+
+impl Model for MaskRCNN {
+    fn dummy_data(&self) -> Array<f32, IxDyn> {
+        let input_shape = IxDyn(&[3, 224, 224]);
+
+        Array::linspace(0.0_f32, 1.0, input_shape.size())
+            .into_shape(input_shape)
+            .unwrap()
+    }
+}
+
 fn main() {
     let subscriber = FmtSubscriber::builder()
-        .with_max_level(Level::TRACE)
+        .with_max_level(Level::INFO)
         .finish();
 
     tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
+
+    let model = MaskRCNN::new();
+    println!("Created model {}", model.name);
 
     let mut session = ENVIRONMENT
         .new_session_builder()
@@ -36,33 +96,13 @@ fn main() {
         .unwrap()
         .with_number_threads(1)
         .unwrap()
-        .with_model_from_file("squeezenet1.0-8.onnx")
+        .with_model_from_file(&model.file)
         .unwrap();
 
-    let input0_shape: Vec<usize> = session.inputs[0]
-        .dimensions()
-        .map(std::option::Option::unwrap)
-        .collect();
-    let output0_shape: Vec<usize> = session.outputs[0]
-        .dimensions()
-        .map(std::option::Option::unwrap)
-        .collect();
+    println!("Session inputs: {:?}", session.inputs);
+    println!("Session outputs: {:?}", session.outputs);
 
-    assert_eq!(input0_shape, [1, 3, 224, 224]);
-    assert_eq!(output0_shape, [1, 1000, 1, 1]);
-
-    // initialize input data with values in [0.0, 1.0]
-    let n: u32 = session.inputs[0]
-        .dimensions
-        .iter()
-        .map(|d| d.unwrap())
-        .product();
-
-    let array = Array::linspace(0.0_f32, 1.0, n as usize)
-        .into_shape(input0_shape)
-        .unwrap();
-
-    let input_tensor_values = vec![array.into()];
+    let input_tensor_values = vec![model.dummy_data().into()];
 
     let outputs: Vec<OrtOwnedTensor<f32, _>> = session.run(input_tensor_values).unwrap();
 
