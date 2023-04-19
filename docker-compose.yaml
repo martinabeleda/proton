@@ -1,8 +1,9 @@
 version: "3.8"
 
-service:
-  build: ./
-  ports:
-    - 8080:8080
-  volumes:
-    - ./:/home
+services:
+  proton:
+    build: ./
+    ports:
+      - 8080:8080
+    volumes:
+      - ./:/home
