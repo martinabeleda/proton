@@ -1,4 +1,4 @@
-use ndarray::Array4;
+use ndarray::{Array, IxDyn};
 use onnxruntime::environment::Environment;
 use onnxruntime::session::Session;
 use onnxruntime::tensor::OrtOwnedTensor;
@@ -51,14 +51,9 @@ impl Model<'_> {
         }
     }
 
-    pub fn predict(&mut self, inputs: Vec<Array4<f32>>) -> Vec<f32> {
+    pub fn predict(&mut self, inputs: Vec<Array<f32, IxDyn>>) -> Array<f32, IxDyn> {
         let outputs = self.session.run(inputs).unwrap();
-        let output: &OrtOwnedTensor<f32, _> = &outputs[0];
 
-        output
-            .softmax(ndarray::Axis(1))
-            .iter()
-            .copied()
-            .collect::<Vec<f32>>()
+        Array::from_shape_vec(outputs[0].shape(), outputs[0].iter().cloned().collect()).unwrap()
     }
 }
