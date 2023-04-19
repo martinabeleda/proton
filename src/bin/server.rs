@@ -1,5 +1,5 @@
 use axum::extract::Extension;
-use axum::routing::post;
+use axum::routing::{get, post};
 use axum::Router;
 use proton::config::Config;
 use std::collections::HashMap;
@@ -8,7 +8,7 @@ use std::sync::Arc;
 use std::thread;
 use tokio::sync::mpsc;
 
-use proton::routes::predict;
+use proton::routes::{models, predict};
 use proton::worker::{InferenceWorker, Message};
 
 #[tokio::main]
@@ -50,6 +50,7 @@ async fn main() {
 
     let app = Router::new()
         .route("/predict", post(predict::handle_inference))
+        .route("/models", get(models::get_models))
         .layer(Extension(Arc::new(config.clone())))
         .layer(Extension(Arc::new(queues_tx)));
 

@@ -34,6 +34,12 @@ Start the service
 cargo run --bin server
 ```
 
+See the deployed models:
+
+```shell
+curl -X GET -H "Content-Type: application/json" http://localhost:8080/models
+```
+
 The client script runs many concurrent requests against the server and logs the elapsed for each
 request and the total time. To run the client:
 
