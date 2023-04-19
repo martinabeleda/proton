@@ -5,6 +5,12 @@
 
 A rust based service for serving machine learning predictions.
 
+## Features
+
+- Concurrency model: thread per model
+- Supports per model queues via async channels
+- Onnxruntime backend
+
 ## Install `onnxruntime`
 
 On MacOS:
