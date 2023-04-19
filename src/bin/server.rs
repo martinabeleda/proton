@@ -1,27 +1,36 @@
 use axum::extract::Extension;
 use axum::routing::{get, post};
 use axum::Router;
+use core::str::FromStr;
 use proton::config::Config;
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use std::thread;
 use tokio::sync::mpsc;
+use tracing::Level;
 
-use proton::routes::{models, predict};
+use proton::routes::{models, predict, ready};
+use proton::state::SharedState;
 use proton::worker::{InferenceWorker, Message};
 
 #[tokio::main]
 async fn main() {
+    // Load config from file
+    let config = Config::load("config.yaml").await.unwrap();
+    let log_level = Level::from_str(&config.log_level).unwrap();
+
     // Set up loggging
     tracing_subscriber::fmt()
-        .with_max_level(tracing::Level::INFO)
+        .with_max_level(log_level)
         .with_file(true)
         .with_line_number(true)
         .init();
 
-    let config = Config::load("config.yaml").await.unwrap();
-    tracing::info!("Loaded config: {:#?}", config);
+    tracing::info!("Loaded config: {:#?}", &config);
+
+    let shared_state = Arc::new(SharedState::new(config.clone()));
+    tracing::debug!("Shared state: {:?}", &shared_state);
 
     // Create separate queues for each model so that models can process messages at
     // different rates. We create a hash map keyed by model name
@@ -41,7 +50,7 @@ async fn main() {
         tracing::info!("Creating InferenceWorker for {:?}", model_name);
 
         let requests_rx = queues_rx.remove(&model_name).unwrap();
-        let mut worker = InferenceWorker::new(model_config.clone());
+        let mut worker = InferenceWorker::new(model_config.clone(), shared_state.clone());
 
         thread::spawn(move || {
             worker.run(requests_rx);
@@ -51,7 +60,8 @@ async fn main() {
     let app = Router::new()
         .route("/predict", post(predict::handle_inference))
         .route("/models", get(models::get_models))
-        .layer(Extension(Arc::new(config.clone())))
+        .route("/ready", get(ready::get_health))
+        .layer(Extension(shared_state))
         .layer(Extension(Arc::new(queues_tx)));
 
     let addr = SocketAddr::from(([127, 0, 0, 1], config.server.port));

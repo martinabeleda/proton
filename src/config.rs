@@ -17,6 +17,7 @@ pub struct ServerConfig {
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct Config {
+    pub log_level: String,
     pub models: Vec<ModelConfig>,
     pub server: ServerConfig,
 }

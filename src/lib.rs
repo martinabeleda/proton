@@ -4,4 +4,5 @@ extern crate lazy_static;
 pub mod config;
 pub mod model;
 pub mod routes;
+pub mod state;
 pub mod worker;
