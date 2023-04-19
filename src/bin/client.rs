@@ -1,5 +1,5 @@
 use ndarray::{Array, Dimension, IxDyn};
-use proton::predict::{InferenceRequest, InferenceResponse};
+use proton::routes::predict::{InferenceRequest, InferenceResponse};
 use rand::prelude::*;
 use reqwest::{Client, StatusCode};
 use std::collections::HashMap;

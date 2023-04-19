@@ -1,29 +1,15 @@
 use axum::extract::Extension;
 use axum::routing::post;
 use axum::Router;
-use proton::config::{Config, ServerConfig};
+use proton::config::Config;
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use std::thread;
 use tokio::sync::mpsc;
 
-use proton::predict::handle_inference;
+use proton::routes::predict;
 use proton::worker::{InferenceWorker, Message};
-
-async fn run_server(config: ServerConfig, queues_tx: HashMap<String, mpsc::Sender<Message>>) {
-    let app = Router::new()
-        .route("/predict", post(handle_inference))
-        .layer(Extension(Arc::new(queues_tx)));
-
-    let addr = SocketAddr::from(([127, 0, 0, 1], config.port));
-    tracing::info!("Starting server, binding to port {:?}", config.port);
-
-    axum::Server::bind(&addr)
-        .serve(app.into_make_service())
-        .await
-        .unwrap();
-}
 
 #[tokio::main]
 async fn main() {
@@ -62,8 +48,16 @@ async fn main() {
         });
     }
 
-    let server_task = run_server(config.server, queues_tx);
+    let app = Router::new()
+        .route("/predict", post(predict::handle_inference))
+        .layer(Extension(Arc::new(config.clone())))
+        .layer(Extension(Arc::new(queues_tx)));
 
-    // Run the worker and the server concurrently
-    tokio::join!(server_task);
+    let addr = SocketAddr::from(([127, 0, 0, 1], config.server.port));
+    tracing::info!("Starting server, binding to port {:?}", &config.server.port);
+
+    axum::Server::bind(&addr)
+        .serve(app.into_make_service())
+        .await
+        .unwrap();
 }
