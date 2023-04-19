@@ -17,10 +17,16 @@ use proton::worker::{InferenceWorker, Message};
 #[tokio::main]
 async fn main() {
     // Load config from file
-    let config = Config::load("config.yaml").await.unwrap();
-    let log_level = Level::from_str(&config.log_level).unwrap();
+    let config = match Config::load("config.yaml").await {
+        Ok(config) => config,
+        Err(err) => panic!("Failed to load config {:?}", err),
+    };
 
-    // Set up loggging
+    // Set up logging
+    let log_level = match Level::from_str(&config.log_level) {
+        Ok(log_level) => log_level,
+        Err(_) => panic!("Unsupported log level {:?}", &config.log_level),
+    };
     tracing_subscriber::fmt()
         .with_max_level(log_level)
         .with_file(true)
@@ -29,6 +35,8 @@ async fn main() {
 
     tracing::info!("Loaded config: {:#?}", &config);
 
+    // Create shared state behine atomic referenced counter to
+    // store config and model readiness state
     let shared_state = Arc::new(SharedState::new(config.clone()));
     tracing::debug!("Shared state: {:?}", &shared_state);
 
@@ -49,7 +57,11 @@ async fn main() {
         let model_name = model_config.name.clone();
         tracing::info!("Creating InferenceWorker for {:?}", model_name);
 
-        let requests_rx = queues_rx.remove(&model_name).unwrap();
+        let requests_rx = match queues_rx.remove(&model_name) {
+            Some(rx) => rx,
+            None => panic!("Failed to find rx for {:?}", &model_name),
+        };
+
         let mut worker = InferenceWorker::new(model_config.clone(), shared_state.clone());
 
         thread::spawn(move || {
