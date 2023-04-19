@@ -16,7 +16,7 @@ use proton::worker::{InferenceWorker, Message};
 async fn main() {
     // Set up loggging
     tracing_subscriber::fmt()
-        .with_max_level(tracing::Level::INFO)
+        .with_max_level(tracing::Level::DEBUG)
         .with_file(true)
         .with_line_number(true)
         .init();
@@ -25,6 +25,7 @@ async fn main() {
     tracing::info!("Loaded config: {:#?}", config.clone());
 
     let shared_state = Arc::new(SharedState::new(config.clone()));
+    tracing::debug!("Shared state: {:?}", &shared_state);
 
     // Create separate queues for each model so that models can process messages at
     // different rates. We create a hash map keyed by model name
@@ -44,7 +45,7 @@ async fn main() {
         tracing::info!("Creating InferenceWorker for {:?}", model_name);
 
         let requests_rx = queues_rx.remove(&model_name).unwrap();
-        let mut worker = InferenceWorker::new(model_config.clone());
+        let mut worker = InferenceWorker::new(model_config.clone(), shared_state.clone());
 
         thread::spawn(move || {
             worker.run(requests_rx);
