@@ -36,13 +36,21 @@ impl InferenceWorker {
         loop {
             let request = requests_rx.blocking_recv().unwrap();
 
-            tracing::info!("Got prediction_id={:?}", request.prediction_id);
+            tracing::info!(
+                "InferenceWorker({:?}): got prediction_id={:?}",
+                &request.model_name,
+                request.prediction_id
+            );
 
             let output = model.predict(vec![request.input_data]);
 
             // Send the prediction back to the handler
-            let _ = request.response_tx.send(output);
-            tracing::info!("Sent prediction_id={:?}", request.prediction_id);
+            request.response_tx.send(output).unwrap();
+            tracing::info!(
+                "InferenceWorker({:?}): sent prediction_id={:?}",
+                &request.model_name,
+                request.prediction_id
+            );
         }
     }
 }

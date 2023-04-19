@@ -1,7 +1,6 @@
 use ndarray::{Array, IxDyn};
 use onnxruntime::environment::Environment;
 use onnxruntime::session::Session;
-use onnxruntime::tensor::OrtOwnedTensor;
 use onnxruntime::{GraphOptimizationLevel, LoggingLevel};
 use std::sync::Arc;
 

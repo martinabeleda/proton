@@ -44,7 +44,11 @@ pub async fn handle_inference(
     requests_tx.send(message).await.unwrap();
     let response = response_rx.await.unwrap();
 
-    tracing::info!("Handler received prediction_id={:?}", prediction_id);
+    tracing::info!(
+        "Handler received prediction_id={:?} for model={}",
+        prediction_id,
+        &request.model_name
+    );
 
     Json(InferenceResponse {
         prediction_id,
