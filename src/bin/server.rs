@@ -1,12 +1,14 @@
 use axum::extract::Extension;
 use axum::routing::{get, post};
 use axum::Router;
+use core::str::FromStr;
 use proton::config::Config;
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use std::thread;
 use tokio::sync::mpsc;
+use tracing::Level;
 
 use proton::routes::{models, predict, ready};
 use proton::state::SharedState;
@@ -14,15 +16,18 @@ use proton::worker::{InferenceWorker, Message};
 
 #[tokio::main]
 async fn main() {
+    // Load config from file
+    let config = Config::load("config.yaml").await.unwrap();
+    let log_level = Level::from_str(&config.log_level).unwrap();
+
     // Set up loggging
     tracing_subscriber::fmt()
-        .with_max_level(tracing::Level::DEBUG)
+        .with_max_level(log_level)
         .with_file(true)
         .with_line_number(true)
         .init();
 
-    let config = Config::load("config.yaml").await.unwrap();
-    tracing::info!("Loaded config: {:#?}", config.clone());
+    tracing::info!("Loaded config: {:#?}", &config);
 
     let shared_state = Arc::new(SharedState::new(config.clone()));
     tracing::debug!("Shared state: {:?}", &shared_state);

@@ -3,6 +3,8 @@ server:
   buffer_size: 64
   port: 8080
 
+log_level: INFO
+
 models:
   - name: "squeezenet"
     path: "squeezenet1.0-8.onnx"
