@@ -12,7 +12,8 @@ pub struct ReadyResponse {
 }
 
 pub async fn get_health(Extension(state): Extension<Arc<SharedState>>) -> impl IntoResponse {
-    let healthy = false;
+    // Service is ready once all models have been initialized
+    let healthy = state.ready.iter().all(|(_, ready)| *ready);
 
     Json(ReadyResponse { healthy })
 }
