@@ -13,6 +13,8 @@ FROM debian:bullseye-slim
 
 COPY --from=builder /usr/local/cargo/bin/proton /usr/local/bin/proton
 
+WORKDIR "/home"
+
 EXPOSE 8080
 
 CMD ["/usr/local/bin/proton"]
