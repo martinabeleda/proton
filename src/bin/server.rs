@@ -8,7 +8,8 @@ use std::sync::Arc;
 use std::thread;
 use tokio::sync::mpsc;
 
-use proton::routes::{models, predict};
+use proton::routes::{models, predict, ready};
+use proton::state::SharedState;
 use proton::worker::{InferenceWorker, Message};
 
 #[tokio::main]
@@ -21,7 +22,9 @@ async fn main() {
         .init();
 
     let config = Config::load("config.yaml").await.unwrap();
-    tracing::info!("Loaded config: {:#?}", config);
+    tracing::info!("Loaded config: {:#?}", config.clone());
+
+    let shared_state = Arc::new(SharedState::new(config.clone()));
 
     // Create separate queues for each model so that models can process messages at
     // different rates. We create a hash map keyed by model name
@@ -51,7 +54,8 @@ async fn main() {
     let app = Router::new()
         .route("/predict", post(predict::handle_inference))
         .route("/models", get(models::get_models))
-        .layer(Extension(Arc::new(config.clone())))
+        .route("/ready", get(ready::get_health))
+        .layer(Extension(shared_state))
         .layer(Extension(Arc::new(queues_tx)));
 
     let addr = SocketAddr::from(([127, 0, 0, 1], config.server.port));

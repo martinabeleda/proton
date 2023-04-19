@@ -4,7 +4,7 @@ use axum::Json;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
-use crate::config::Config;
+use crate::state::SharedState;
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct ModelsResponse {
@@ -16,8 +16,9 @@ pub struct Model {
     pub name: String,
 }
 
-pub async fn get_models(Extension(config): Extension<Arc<Config>>) -> impl IntoResponse {
-    let models: Vec<Model> = config
+pub async fn get_models(Extension(state): Extension<Arc<SharedState>>) -> impl IntoResponse {
+    let models: Vec<Model> = state
+        .config
         .models
         .iter()
         .map(|model_config| Model {
