@@ -8,3 +8,6 @@
 /target
 
 *.onnx
+
+# Don't store local grafana data
+monitoring/grafana/data/

@@ -9,6 +9,7 @@ use std::sync::Arc;
 use std::thread;
 use tokio::sync::mpsc;
 use tracing::Level;
+use axum_prometheus::PrometheusMetricLayer;
 
 use proton::routes::{models, predict, ready};
 use proton::state::SharedState;
@@ -34,6 +35,8 @@ async fn main() {
         .init();
 
     tracing::info!("Loaded config: {:#?}", &config);
+
+    let (prometheus_layer, metric_handle) = PrometheusMetricLayer::pair();
 
     // Create shared state behine atomic referenced counter to
     // store config and model readiness state
@@ -73,6 +76,8 @@ async fn main() {
         .route("/predict", post(predict::handle_inference))
         .route("/models", get(models::get_models))
         .route("/ready", get(ready::get_health))
+        .route("/metrics", get(|| async move { metric_handle.render() }))
+        .layer(prometheus_layer)
         .layer(Extension(shared_state))
         .layer(Extension(Arc::new(queues_tx)));
 
