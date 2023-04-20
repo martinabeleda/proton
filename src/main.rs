@@ -2,7 +2,6 @@ use axum::extract::Extension;
 use axum::routing::{get, post};
 use axum::Router;
 use axum_prometheus::PrometheusMetricLayer;
-use core::str::FromStr;
 use proton::config::Config;
 use std::collections::HashMap;
 use std::net::SocketAddr;
@@ -11,10 +10,10 @@ use std::thread;
 use tokio::sync::mpsc;
 use tonic::transport::Server as GrpcServer;
 use tonic::{Request, Response, Status};
-use tracing::Level;
 
 use proton::grpc::predictor_server::{Predictor, PredictorServer};
 use proton::grpc::{InferenceRequest, InferenceResponse};
+use proton::logging;
 use proton::routes::{models, predict, ready};
 use proton::state::SharedState;
 use proton::worker::{InferenceWorker, Message};
@@ -43,26 +42,14 @@ impl Predictor for MyPredictService {
 
 #[tokio::main]
 async fn main() {
-    // Load config from file
-    let config = match Config::load("config.yaml").await {
+    let config = match Config::load("config.yaml") {
         Ok(config) => config,
         Err(err) => panic!("Failed to load config {:?}", err),
     };
 
-    // Set up logging
-    let log_level = match Level::from_str(&config.log_level) {
-        Ok(log_level) => log_level,
-        Err(_) => panic!("Unsupported log level {:?}", &config.log_level),
-    };
-    tracing_subscriber::fmt()
-        .with_max_level(log_level)
-        .with_file(true)
-        .with_line_number(true)
-        .init();
+    logging::setup(&config.log_level);
 
-    tracing::info!("Loaded config: {:#?}", &config);
-
-    let (prometheus_layer, metric_handle) = PrometheusMetricLayer::pair();
+    tracing::info!("Starting proton with config: {:#?}", &config);
 
     // Create shared state behine atomic referenced counter to
     // store config and model readiness state
@@ -97,6 +84,8 @@ async fn main() {
             worker.run(requests_rx);
         });
     }
+
+    let (prometheus_layer, metric_handle) = PrometheusMetricLayer::pair();
 
     let app = Router::new()
         .route("/predict", post(predict::handle_inference))
