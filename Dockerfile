@@ -18,6 +18,7 @@ RUN wget https://github.com/microsoft/onnxruntime/releases/download/v1.14.1/onnx
 
 ENV ORT_LIB_LOCATION=/lib/onnxruntime
 ENV ORT_STRATEGY=system
+ENV LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/lib/onnxruntime/lib
 
 COPY . .
 RUN cargo install --path .
