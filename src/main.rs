@@ -1,6 +1,7 @@
 use axum::extract::Extension;
 use axum::routing::{get, post};
 use axum::Router;
+use axum_prometheus::PrometheusMetricLayer;
 use core::str::FromStr;
 use proton::config::Config;
 use std::collections::HashMap;
@@ -8,13 +9,12 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 use std::thread;
 use tokio::sync::mpsc;
-use tracing::Level;
-use axum_prometheus::PrometheusMetricLayer;
 use tonic::transport::Server as GrpcServer;
 use tonic::{Request, Response, Status};
+use tracing::Level;
 
-use proton::grpc::{InferenceRequest, InferenceResponse};
 use proton::grpc::predictor_server::{Predictor, PredictorServer};
+use proton::grpc::{InferenceRequest, InferenceResponse};
 use proton::routes::{models, predict, ready};
 use proton::state::SharedState;
 use proton::worker::{InferenceWorker, Message};
@@ -110,8 +110,7 @@ async fn main() {
     let addr = SocketAddr::from(([0, 0, 0, 0], config.server.port));
     tracing::info!("Starting server, binding to port {:?}", &config.server.port);
 
-    let axum_server = axum::Server::bind(&addr)
-        .serve(app.into_make_service());
+    let axum_server = axum::Server::bind(&addr).serve(app.into_make_service());
 
     let grpc_addr = SocketAddr::from(([0, 0, 0, 0], config.server.grpc_port));
     let grpc_server = GrpcServer::builder()

@@ -7,6 +7,7 @@ A rust based service for serving machine learning predictions.
 
 ## Features
 
+- Supports REST and gRPC
 - Concurrency model: thread per model
 - Supports per model queues via async channels
 - Onnxruntime backend
