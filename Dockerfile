@@ -24,4 +24,4 @@ RUN cargo install --path .
 
 EXPOSE 8080
 
-CMD ["/usr/local/bin/proton"]
+CMD ["/usr/local/cargo/bin/proton"]
