@@ -31,6 +31,8 @@ pub struct InferenceWorker {
 ///
 impl InferenceWorker {
     pub fn new(config: ModelConfig, shared_state: Arc<SharedState>) -> Self {
+        tracing::info!("Creating InferenceWorker for {:?}", &config.name);
+
         Self {
             config,
             shared_state,

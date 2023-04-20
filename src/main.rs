@@ -56,27 +56,15 @@ async fn main() {
     let shared_state = Arc::new(SharedState::new(config.clone()));
     tracing::debug!("Shared state: {:?}", &shared_state);
 
-    // Create separate queues for each model so that models can process messages at
-    // different rates. We create a hash map keyed by model name
-    let mut queues_tx: HashMap<String, mpsc::Sender<Message>> = HashMap::new();
-    let mut queues_rx: HashMap<String, mpsc::Receiver<Message>> = HashMap::new();
-    for model_config in config.models.iter() {
-        let (tx, rx) = mpsc::channel::<Message>(config.server.buffer_size);
-        queues_tx.insert(model_config.name.clone(), tx);
-        queues_rx.insert(model_config.name.clone(), rx);
-    }
-
     // Spawn threads to run our workers in the background. We communicate with the threads using
     // the channels we created earlier. Each thread gets the receiving end and the sender sides
     // are provided to the `handle_inference` function
+    let mut queues_tx: HashMap<String, mpsc::Sender<Message>> = HashMap::new();
     for model_config in config.models.iter() {
-        let model_name = model_config.name.clone();
-        tracing::info!("Creating InferenceWorker for {:?}", model_name);
-
-        let requests_rx = match queues_rx.remove(&model_name) {
-            Some(rx) => rx,
-            None => panic!("Failed to find rx for {:?}", &model_name),
-        };
+        // Create a separate queue for each worker so that worker can process messages at
+        // different rates
+        let (requests_tx, requests_rx) = mpsc::channel::<Message>(config.server.buffer_size);
+        queues_tx.insert(model_config.name.clone(), requests_tx);
 
         let mut worker = InferenceWorker::new(model_config.clone(), shared_state.clone());
 
