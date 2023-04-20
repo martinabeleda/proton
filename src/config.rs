@@ -13,6 +13,7 @@ pub struct ServerConfig {
     pub num_threads: i16,
     pub buffer_size: usize,
     pub port: u16,
+    pub grpc_port: u16,
 }
 
 #[derive(Clone, Debug, Deserialize)]

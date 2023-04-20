@@ -10,10 +10,36 @@ use std::thread;
 use tokio::sync::mpsc;
 use tracing::Level;
 use axum_prometheus::PrometheusMetricLayer;
+use tonic::transport::Server as GrpcServer;
+use tonic::{Request, Response, Status};
 
+use proton::grpc::{InferenceRequest, InferenceResponse};
+use proton::grpc::predictor_server::{Predictor, PredictorServer};
 use proton::routes::{models, predict, ready};
 use proton::state::SharedState;
 use proton::worker::{InferenceWorker, Message};
+
+#[derive(Debug, Default)]
+pub struct MyPredictService;
+
+#[tonic::async_trait]
+impl Predictor for MyPredictService {
+    async fn predict(
+        &self,
+        request: Request<InferenceRequest>,
+    ) -> Result<Response<InferenceResponse>, Status> {
+        let _input = request.into_inner();
+
+        let response = InferenceResponse {
+            model_name: String::from("my_model"),
+            prediction_id: String::from("some_id"),
+            data: vec![0.0, 1.0],
+            shape: vec![2],
+        };
+
+        Ok(Response::new(response))
+    }
+}
 
 #[tokio::main]
 async fn main() {
@@ -84,8 +110,25 @@ async fn main() {
     let addr = SocketAddr::from(([0, 0, 0, 0], config.server.port));
     tracing::info!("Starting server, binding to port {:?}", &config.server.port);
 
-    axum::Server::bind(&addr)
-        .serve(app.into_make_service())
-        .await
-        .unwrap();
+    let axum_server = axum::Server::bind(&addr)
+        .serve(app.into_make_service());
+
+    let grpc_addr = SocketAddr::from(([0, 0, 0, 0], config.server.grpc_port));
+    let grpc_server = GrpcServer::builder()
+        .add_service(PredictorServer::new(MyPredictService {}))
+        .serve(grpc_addr);
+
+    tracing::info!("Starting servers");
+
+    // Run both servers concurrently
+    tokio::select! {
+        axum_result = axum_server => {
+            tracing::info!("Axum server exited");
+            axum_result.unwrap();
+        }
+        grpc_result = grpc_server => {
+            tracing::info!("gRPC server exited");
+            grpc_result.unwrap();
+        }
+    }
 }

@@ -6,3 +6,7 @@ pub mod model;
 pub mod routes;
 pub mod state;
 pub mod worker;
+
+pub mod grpc {
+    tonic::include_proto!("predict");
+}

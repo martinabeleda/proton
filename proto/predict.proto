@@ -1,0 +1,23 @@
+syntax = "proto3";
+
+package predict;
+
+// Define the message for the input data
+message InferenceRequest {
+  string model_name = 1;
+  repeated float data = 2;
+  repeated int32 shape = 3;
+}
+
+// Define the message for the output data
+message InferenceResponse {
+  string prediction_id = 1;
+  string model_name = 2;
+  repeated float data = 3;
+  repeated int32 shape = 4;
+}
+
+// Define the service with the predict method
+service Predictor {
+  rpc Predict(InferenceRequest) returns (InferenceResponse);
+}

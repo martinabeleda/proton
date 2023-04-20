@@ -38,5 +38,9 @@ name = "client"
 path = "src/bin/client.rs"
 
 [[bin]]
+name = "grpc-client"
+path = "src/bin/grpc_client.rs"
+
+[[bin]]
 name = "onnx"
 path = "src/bin/onnx.rs"
