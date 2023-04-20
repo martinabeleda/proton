@@ -107,7 +107,7 @@ async fn main() {
 
     let client = Client::new();
 
-    let num_requests = 50; // number of concurrent requests
+    let num_requests = 20; // number of concurrent requests
     let mut futures: Vec<JoinHandle<(String, Duration)>> = Vec::with_capacity(num_requests);
     let mut rng = thread_rng();
 

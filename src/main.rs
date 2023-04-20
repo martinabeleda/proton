@@ -76,7 +76,7 @@ async fn main() {
         .layer(Extension(shared_state))
         .layer(Extension(Arc::new(queues_tx)));
 
-    let addr = SocketAddr::from(([127, 0, 0, 1], config.server.port));
+    let addr = SocketAddr::from(([0, 0, 0, 0], config.server.port));
     tracing::info!("Starting server, binding to port {:?}", &config.server.port);
 
     axum::Server::bind(&addr)
