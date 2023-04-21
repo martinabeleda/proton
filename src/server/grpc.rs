@@ -1,9 +1,12 @@
+use ndarray::{Array, IxDyn};
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::sync::mpsc::Sender;
+use tokio::sync::oneshot;
 use tonic::transport::{Error, Server};
 use tonic::{Request, Response, Status};
+use uuid::Uuid;
 
 use crate::predictor::predictor_server::{Predictor, PredictorServer};
 use crate::predictor::{InferenceRequest, InferenceResponse};
@@ -26,13 +29,53 @@ impl Predictor for PredictService {
         &self,
         request: Request<InferenceRequest>,
     ) -> Result<Response<InferenceResponse>, Status> {
-        let _input = request.into_inner();
+        let request = request.into_inner();
+
+        let prediction_id = Uuid::new_v4();
+
+        // Create a channel to receive the inference result
+        let (tx, rx) = oneshot::channel();
+
+        let input_shape: Vec<usize> = request.shape.iter().map(|&value| value as usize).collect();
+
+        let input_shape = IxDyn(&input_shape[..]);
+
+        let input_data = Array::from_shape_vec(input_shape, request.data).unwrap();
+
+        let message = Message {
+            prediction_id,
+            input_data,
+            model_name: request.model_name.clone(),
+            response_tx: tx,
+        };
+
+        self.queues_tx
+            .get(&request.model_name)
+            .unwrap()
+            .send(message)
+            .await
+            .unwrap();
+
+        let response = rx.await.unwrap();
+
+        tracing::info!(
+            "gRPC Handler received prediction_id={:?} for model={}",
+            prediction_id,
+            &request.model_name
+        );
+
+        let shape = response
+            .shape()
+            .to_vec()
+            .iter()
+            .map(|&value| value as i32)
+            .collect();
 
         let response = InferenceResponse {
-            model_name: String::from("my_model"),
-            prediction_id: String::from("some_id"),
-            data: vec![0.0, 1.0],
-            shape: vec![2],
+            model_name: request.model_name,
+            prediction_id: prediction_id.to_string(),
+            data: response.into_raw_vec(),
+            shape,
         };
 
         Ok(Response::new(response))
