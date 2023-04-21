@@ -12,9 +12,17 @@ A rust based service for serving machine learning predictions.
 - Supports per model queues via async channels
 - Onnxruntime backend
 
-## Install `onnxruntime`
+## Dependencies
 
-On MacOS:
+### Protbuf
+
+In order to build the gRPC server, you'l need the `protoc` Protocol Buffers compiler. See [the tonic documentation](https://github.com/hyperium/tonic#dependencies) to set this up.
+
+### Onnxruntime
+
+Onnxruntime is the engine we use to power inference. See [onnxruntime docs](https://onnxruntime.ai/index.html#getStartedTable) for more complete installation instructions.
+
+#### MacOS
 
 ```shell
 brew install onnxruntime
@@ -23,7 +31,24 @@ brew install onnxruntime
 Export the lib path:
 
 ```shell
-export ONNX_RUNTIME_LIB_DIR=$(brew --prefix onnxruntime)
+export ORT_STRATEGY=system
+export ORT_LIB_LOCATION=$(brew --prefix onnxruntime)
+```
+
+#### Linux
+
+On Linux, you'll need to download the tarball
+
+```shell
+wget https://github.com/microsoft/onnxruntime/releases/download/v1.14.1/onnxruntime-linux-x64-1.14.1.tgz
+tar zxf onnxruntime-linux-x64-1.14.1.tgz
+mv onnxruntime-linux-x64-1.14.1 /lib/onnxruntime
+```
+
+```shell
+export ORT_STRATEGY=system
+export ORT_LIB_LOCATION=/lib/onnxruntime
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/lib/onnxruntime/lib
 ```
 
 ## Testing
