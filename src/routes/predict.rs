@@ -27,22 +27,26 @@ pub async fn handle_inference(
     Extension(queues_tx): Extension<Arc<HashMap<String, mpsc::Sender<Message>>>>,
     Json(request): Json<InferenceRequest>,
 ) -> impl IntoResponse {
-    // Create a channel to receive the inference result
-    let (response_tx, response_rx) = oneshot::channel();
-
-    // Generate a prediction_id for this request
     let prediction_id = Uuid::new_v4();
+
+    // Create a channel to receive the inference result
+    let (tx, rx) = oneshot::channel();
 
     let message = Message {
         prediction_id,
         model_name: request.model_name.clone(),
         input_data: request.data,
-        response_tx,
+        response_tx: tx,
     };
 
-    let requests_tx = queues_tx.get(&request.model_name).unwrap();
-    requests_tx.send(message).await.unwrap();
-    let response = response_rx.await.unwrap();
+    queues_tx
+        .get(&request.model_name)
+        .unwrap()
+        .send(message)
+        .await
+        .unwrap();
+
+    let response = rx.await.unwrap();
 
     tracing::info!(
         "Handler received prediction_id={:?} for model={}",
