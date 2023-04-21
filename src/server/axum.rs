@@ -13,7 +13,7 @@ use crate::worker::Message;
 
 pub async fn build(
     port: u16,
-    queues_tx: HashMap<String, Sender<Message>>,
+    queues_tx: Arc<HashMap<String, Sender<Message>>>,
     shared_state: Arc<SharedState>,
 ) -> Result<(), hyper::Error> {
     let (prometheus_layer, metric_handle) = PrometheusMetricLayer::pair();
@@ -25,7 +25,7 @@ pub async fn build(
         .route("/metrics", get(|| async move { metric_handle.render() }))
         .layer(prometheus_layer)
         .layer(Extension(shared_state))
-        .layer(Extension(Arc::new(queues_tx)));
+        .layer(Extension(queues_tx));
 
     let addr = SocketAddr::from(([0, 0, 0, 0], port));
     tracing::info!("Starting server, binding to port {:?}", port);

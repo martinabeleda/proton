@@ -1,12 +1,24 @@
+use std::collections::HashMap;
 use std::net::SocketAddr;
+use std::sync::Arc;
+use tokio::sync::mpsc::Sender;
 use tonic::transport::{Error, Server};
 use tonic::{Request, Response, Status};
 
 use crate::predictor::predictor_server::{Predictor, PredictorServer};
 use crate::predictor::{InferenceRequest, InferenceResponse};
+use crate::worker::Message;
 
 #[derive(Debug, Default)]
-pub struct PredictService;
+pub struct PredictService {
+    queues_tx: Arc<HashMap<String, Sender<Message>>>,
+}
+
+impl PredictService {
+    fn new(queues_tx: Arc<HashMap<String, Sender<Message>>>) -> Self {
+        Self { queues_tx }
+    }
+}
 
 #[tonic::async_trait]
 impl Predictor for PredictService {
@@ -27,11 +39,16 @@ impl Predictor for PredictService {
     }
 }
 
-pub async fn build(port: u16) -> Result<(), Error> {
+pub async fn build(
+    port: u16,
+    queues_tx: Arc<HashMap<String, Sender<Message>>>,
+) -> Result<(), Error> {
     let grpc_addr = SocketAddr::from(([0, 0, 0, 0], port));
 
+    let predict_service = PredictService::new(queues_tx);
+
     Server::builder()
-        .add_service(PredictorServer::new(PredictService {}))
+        .add_service(PredictorServer::new(predict_service))
         .serve(grpc_addr)
         .await
 }

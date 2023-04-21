@@ -41,16 +41,17 @@ async fn main() {
             worker.run(requests_rx);
         });
     }
+    let queues_tx = Arc::new(queues_tx);
 
     tracing::info!("Starting servers");
 
     // Run both servers concurrently
     tokio::select! {
-        grpc_result = axum::build(config.server.port, queues_tx, shared_state) => {
+        grpc_result = axum::build(config.server.port, Arc::clone(&queues_tx), shared_state) => {
             tracing::info!("gRPC server exited");
             grpc_result.unwrap();
         }
-        axum_result = grpc::build(config.server.grpc_port) => {
+        axum_result = grpc::build(config.server.grpc_port, queues_tx) => {
             tracing::info!("Axum server exited");
             axum_result.unwrap();
         }
