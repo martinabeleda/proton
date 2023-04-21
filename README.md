@@ -1,18 +1,18 @@
-# proton
+# Proton
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 ![main workflow](https://github.com/martinabeleda/proton/actions/workflows/rust.yml/badge.svg)
 
 A rust based service for serving machine learning predictions.
 
-## Features
+## :pencil: Features
 
 - Supports REST and gRPC
 - Concurrency model: thread per model
 - Supports per model queues via async channels
 - Onnxruntime backend
 
-## Dependencies
+## :construction: Dependencies
 
 ### Protbuf
 
@@ -51,7 +51,7 @@ export ORT_LIB_LOCATION=/lib/onnxruntime
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/lib/onnxruntime/lib
 ```
 
-## Testing
+## :test_tube: Testing
 
 Download the test models:
 
