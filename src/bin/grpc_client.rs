@@ -1,8 +1,8 @@
 use std::error::Error;
 use tonic::Request;
 
-use proton::grpc::predictor_client::PredictorClient;
-use proton::grpc::InferenceRequest;
+use proton::predictor::predictor_client::PredictorClient;
+use proton::predictor::InferenceRequest;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
