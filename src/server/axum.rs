@@ -28,7 +28,7 @@ pub async fn build(
         .layer(Extension(queues_tx));
 
     let addr = SocketAddr::from(([0, 0, 0, 0], port));
-    tracing::info!("Starting server, binding to port {:?}", port);
+    tracing::info!("Starting axum server, binding to port {:?}", port);
 
     Server::bind(&addr).serve(app.into_make_service()).await
 }

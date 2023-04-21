@@ -31,8 +31,6 @@ pub struct InferenceWorker {
 ///
 impl InferenceWorker {
     pub fn new(config: ModelConfig, shared_state: Arc<SharedState>) -> Self {
-        tracing::info!("Creating InferenceWorker for {:?}", &config.name);
-
         Self {
             config,
             shared_state,
@@ -41,7 +39,7 @@ impl InferenceWorker {
 
     pub fn run(&mut self, mut requests_rx: mpsc::Receiver<Message>) {
         let mut model = Model::new(&self.config);
-        tracing::info!("InferenceWorker({:?}): model ready", &self.config.name);
+        tracing::info!("{:?} model ready", &self.config.name);
 
         // Update shared state to flag this model as ready
         self.shared_state
@@ -49,27 +47,20 @@ impl InferenceWorker {
             .get(&self.config.name)
             .unwrap()
             .store(true, Ordering::Relaxed);
-        tracing::debug!("Shared state: {:?}", &self.shared_state);
 
         // Run the worker loop
         loop {
             let request = requests_rx.blocking_recv().unwrap();
+            let model_name = request.model_name;
+            let id = request.prediction_id;
 
-            tracing::info!(
-                "InferenceWorker({:?}): got prediction_id={:?}",
-                &request.model_name,
-                request.prediction_id
-            );
+            tracing::info!("{:?} got prediction_id={:?}", model_name, id);
 
             let output = model.predict(vec![request.input_data]);
 
             // Send the prediction back to the handler
             request.response_tx.send(output).unwrap();
-            tracing::info!(
-                "InferenceWorker({:?}): sent prediction_id={:?}",
-                &request.model_name,
-                request.prediction_id
-            );
+            tracing::info!("{:?} sent prediction_id={:?}", model_name, id);
         }
     }
 }

@@ -21,9 +21,16 @@ async fn main() -> Result<(), Box<dyn Error>> {
         shape: input_shape,
     });
 
-    let response = client.predict(request).await?;
-
-    println!("RESPONSE={:?}", response);
+    match client.predict(request).await {
+        Ok(res) => {
+            let response = res.into_inner();
+            println!(
+                "Success for model {}, prediction_id={}",
+                response.model_name, response.prediction_id
+            );
+        }
+        Err(err) => println!("Error {:?}", err),
+    }
 
     Ok(())
 }

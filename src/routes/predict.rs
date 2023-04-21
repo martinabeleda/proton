@@ -28,19 +28,25 @@ pub async fn handle_inference(
     Json(request): Json<InferenceRequest>,
 ) -> impl IntoResponse {
     let prediction_id = Uuid::new_v4();
+    let model_name = request.model_name.clone();
+    tracing::info!(
+        "handler created prediction_id={:?} for model={}",
+        prediction_id,
+        &model_name
+    );
 
     // Create a channel to receive the inference result
     let (tx, rx) = oneshot::channel();
 
     let message = Message {
         prediction_id,
-        model_name: request.model_name.clone(),
+        model_name: model_name.clone(),
         input_data: request.data,
         response_tx: tx,
     };
 
     queues_tx
-        .get(&request.model_name)
+        .get(&model_name)
         .unwrap()
         .send(message)
         .await
@@ -49,9 +55,9 @@ pub async fn handle_inference(
     let response = rx.await.unwrap();
 
     tracing::info!(
-        "Handler received prediction_id={:?} for model={}",
+        "handler received prediction_id={:?} for model={}",
         prediction_id,
-        &request.model_name
+        &model_name
     );
 
     Json(InferenceResponse {

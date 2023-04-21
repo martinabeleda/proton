@@ -43,8 +43,6 @@ async fn main() {
     }
     let queues_tx = Arc::new(queues_tx);
 
-    tracing::info!("Starting servers");
-
     // Run both servers concurrently
     tokio::select! {
         grpc_result = axum::build(config.server.port, Arc::clone(&queues_tx), shared_state) => {

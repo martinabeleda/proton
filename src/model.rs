@@ -36,13 +36,8 @@ impl Model<'_> {
             .with_model_from_file(config.path.clone())
             .unwrap();
 
-        tracing::info!(
-            "Created onnx session for model: {:?} at path: {:?}",
-            config.name,
-            config.path
-        );
-        tracing::info!("Inputs: {:?}", session.inputs);
-        tracing::info!("Outputs: {:?}", session.outputs);
+        tracing::info!("{:?} inputs: {:?}", config.name, session.inputs);
+        tracing::info!("{:?} outputs: {:?}", config.name, session.outputs);
 
         Self {
             config: config.clone(),
