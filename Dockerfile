@@ -4,6 +4,8 @@ WORKDIR /home
 
 RUN apt-get update && \
     apt-get -y install \
+        protobuf-compiler \
+        libprotobuf-dev \
         ca-certificates \
         cmake \
         pkg-config \

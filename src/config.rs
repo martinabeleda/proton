@@ -1,6 +1,6 @@
 use serde::Deserialize;
 use std::error::Error;
-use tokio::fs;
+use std::fs::read_to_string;
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct ModelConfig {
@@ -13,6 +13,7 @@ pub struct ServerConfig {
     pub num_threads: i16,
     pub buffer_size: usize,
     pub port: u16,
+    pub grpc_port: u16,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -23,9 +24,10 @@ pub struct Config {
 }
 
 impl Config {
-    pub async fn load(path: &str) -> Result<Config, Box<dyn Error>> {
-        let config_data = fs::read_to_string(path).await?;
+    pub fn load(path: &str) -> Result<Config, Box<dyn Error>> {
+        let config_data = read_to_string(path)?;
         let config: Config = serde_yaml::from_str(&config_data)?;
+
         Ok(config)
     }
 }
