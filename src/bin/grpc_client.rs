@@ -1,36 +1,68 @@
 use rand::prelude::*;
-use std::error::Error;
+use std::collections::HashMap;
+use std::time::Duration;
+use tokio::task::JoinHandle;
+use tonic::transport::Channel;
 use tonic::Request;
 
 use proton::predictor::predictor_client::PredictorClient;
 use proton::predictor::InferenceRequest;
+use proton::utils::{analyze_results, MaskRCNN, Model, Squeezenet};
+
+const NUM_REQUESTS: usize = 20;
+
+async fn send_request(
+    client: &mut PredictorClient<Channel>,
+    request: Request<InferenceRequest>,
+) -> (String, Duration) {
+    let start_time = tokio::time::Instant::now();
+
+    let response = client.predict(request).await.unwrap().into_inner();
+    println!(
+        "Success for model {}, prediction_id={}",
+        response.model_name, response.prediction_id
+    );
+
+    (response.model_name, start_time.elapsed())
+}
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn Error>> {
-    let mut client = PredictorClient::connect("http://0.0.0.0:50051").await?;
+async fn main() {
+    let mut models: Vec<&dyn Model> = Vec::new();
+    models.push(&MaskRCNN {});
+    models.push(&Squeezenet {});
 
-    let input_shape = vec![1, 3, 224, 224];
-    let n = input_shape.iter().product();
+    let client = PredictorClient::connect("http://0.0.0.0:50051")
+        .await
+        .unwrap();
+    let mut rng = thread_rng();
+    let mut futures: Vec<JoinHandle<(String, Duration)>> = Vec::with_capacity(NUM_REQUESTS);
 
-    let mut rng = rand::thread_rng();
-    let random_vector: Vec<f32> = (0..n).map(|_| rng.gen()).collect();
+    for _ in 0..NUM_REQUESTS {
+        let model = models.choose(&mut rng).unwrap();
+        let n = model.input_shape().iter().product();
+        let random_vector: Vec<f32> = (0..n).map(|_| rng.gen()).collect();
 
-    let request = Request::new(InferenceRequest {
-        model_name: "squeezenet".into(),
-        data: random_vector,
-        shape: input_shape,
-    });
+        println!("Sending request for {:?}", &model.name());
+        let request = Request::new(InferenceRequest {
+            model_name: model.name(),
+            data: random_vector,
+            shape: model.input_shape().iter().map(|x| *x as i32).collect(),
+        });
 
-    match client.predict(request).await {
-        Ok(res) => {
-            let response = res.into_inner();
-            println!(
-                "Success for model {}, prediction_id={}",
-                response.model_name, response.prediction_id
-            );
-        }
-        Err(err) => println!("Error {:?}", err),
+        let mut client = client.clone();
+        let task = tokio::spawn(async move { send_request(&mut client, request).await });
+        futures.push(task);
     }
 
-    Ok(())
+    let mut elapsed_times: HashMap<String, Vec<Duration>> = HashMap::new();
+    for future in futures {
+        let (model_name, duration) = future.await.unwrap();
+        elapsed_times
+            .entry(model_name)
+            .or_insert_with(Vec::new)
+            .push(duration);
+    }
+
+    analyze_results(elapsed_times);
 }
