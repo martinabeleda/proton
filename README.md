@@ -85,7 +85,7 @@ We also provide the same client for gRPC:
 cargo run --bin grpc-client
 ```
 
-## :bench: Benchmark
+## :microscope: Benchmark
 
 Running locally on an M1 Macbook pro, gRPC performs better. The gap is marginal for MaskRCNN where compute
 is a much larger proportion of the response time
