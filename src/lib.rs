@@ -7,6 +7,7 @@ pub mod model;
 pub mod routes;
 pub mod server;
 pub mod state;
+pub mod utils;
 pub mod worker;
 
 pub mod predictor {

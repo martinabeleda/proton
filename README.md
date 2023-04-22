@@ -76,24 +76,23 @@ The client script runs many concurrent requests against the server and logs the 
 request and the total time. To run the client:
 
 ```shell
-❯ cargo run --bin client
-2023-04-19T18:31:32.023177Z  INFO client: src/bin/client.rs:112: Sending request for "squeezenet"
-2023-04-19T18:31:32.026326Z  INFO client: src/bin/client.rs:112: Sending request for "maskrcnn"
-...
-2023-04-19T18:31:32.910031Z  INFO client: src/bin/client.rs:75: Success for model "squeezenet", prediction_id: 1ff1417e-5b8e-4fa7-8aff-5111fa50f3ac
-2023-04-19T18:31:33.722041Z  INFO client: src/bin/client.rs:75: Success for model "maskrcnn", prediction_id: 373fdc2c-8455-4b54-b7a5-f910ba1c506c
-...
-2023-04-19T18:32:00.538712Z  INFO client: src/bin/client.rs:143: Model: "squeezenet"
-2023-04-19T18:32:00.538725Z  INFO client: src/bin/client.rs:144: Total time: 13.100649499s
-2023-04-19T18:32:00.538734Z  INFO client: src/bin/client.rs:145: Average time: 524.025979ms
-2023-04-19T18:32:00.538742Z  INFO client: src/bin/client.rs:146: Median time: 551.289125ms
-2023-04-19T18:32:00.538750Z  INFO client: src/bin/client.rs:147: p95 time: 630.9305ms
-2023-04-19T18:32:00.538759Z  INFO client: src/bin/client.rs:148: p99 time: 680.362292ms
-...
-2023-04-19T18:32:00.538772Z  INFO client: src/bin/client.rs:143: Model: "maskrcnn"
-2023-04-19T18:32:00.538778Z  INFO client: src/bin/client.rs:144: Total time: 372.399760668s
-2023-04-19T18:32:00.538784Z  INFO client: src/bin/client.rs:145: Average time: 14.895990426s
-2023-04-19T18:32:00.538789Z  INFO client: src/bin/client.rs:146: Median time: 14.996715167s
-2023-04-19T18:32:00.538795Z  INFO client: src/bin/client.rs:147: p95 time: 27.056427083s
-2023-04-19T18:32:00.538801Z  INFO client: src/bin/client.rs:148: p99 time: 28.186501209s
+cargo run --bin client
 ```
+
+We also provide the same client for gRPC:
+
+```shell
+cargo run --bin grpc-client
+```
+
+## :bench: Benchmark
+
+Running locally on an M1 Macbook pro, gRPC performs better. The gap is marginal for MaskRCNN where compute
+is a much larger proportion of the response time
+
+| Client Type | Model      | Total Time    | Average Time | Median Time  | p95 Time      | p99 Time      |
+| ----------- | ---------- | ------------- | ------------ | ------------ | ------------- | ------------- |
+| client      | squeezenet | 1.225398832s  | 136.155425ms | 143.143708ms | 198.443083ms  | 198.443083ms  |
+| grpc-client | squeezenet | 182.413958ms  | 18.241395ms  | 17.662917ms  | 20.213208ms   | 20.213208ms   |
+| client      | maskrcnn   | 76.612492085s | 6.964772007s | 6.975712042s | 11.401473875s | 12.505639542s |
+| grpc-client | maskrcnn   | 57.749369832s | 5.774936983s | 5.363160166s | 10.23204925s  | 10.23204925s  |
