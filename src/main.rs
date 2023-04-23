@@ -23,7 +23,6 @@ async fn main() {
     // Create shared state behine atomic referenced counter to
     // store config and model readiness state
     let shared_state = Arc::new(SharedState::new(config.clone()));
-    tracing::debug!("Shared state: {:?}", &shared_state);
 
     // Spawn threads to run our workers in the background. We communicate with the threads using
     // the channels we created earlier. Each thread gets the receiving end and the sender sides
