@@ -100,8 +100,8 @@ pub async fn build(
     Server::builder()
         .add_service(
             PredictorServer::new(predict_service)
-                .accept_compressed(CompressionEncoding::Gzip)
-                .send_compressed(CompressionEncoding::Gzip),
+                .accept_compressed(CompressionEncoding::Zstd)
+                .send_compressed(CompressionEncoding::Zstd),
         )
         .serve(grpc_addr)
         .await

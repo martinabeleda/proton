@@ -39,8 +39,8 @@ async fn main() {
         .unwrap();
 
     let client = PredictorClient::new(channel)
-        .send_compressed(CompressionEncoding::Gzip)
-        .accept_compressed(CompressionEncoding::Gzip);
+        .send_compressed(CompressionEncoding::Zstd)
+        .accept_compressed(CompressionEncoding::Zstd);
 
     let mut rng = thread_rng();
     let mut futures: Vec<JoinHandle<(String, Duration)>> = Vec::with_capacity(NUM_REQUESTS);
