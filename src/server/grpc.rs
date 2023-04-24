@@ -4,6 +4,7 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::oneshot;
+use tonic::codec::CompressionEncoding;
 use tonic::transport::{Error, Server};
 use tonic::{Request, Response, Status};
 use uuid::Uuid;
@@ -97,7 +98,11 @@ pub async fn build(
     let predict_service = PredictService::new(queues_tx);
 
     Server::builder()
-        .add_service(PredictorServer::new(predict_service))
+        .add_service(
+            PredictorServer::new(predict_service)
+                .accept_compressed(CompressionEncoding::Gzip)
+                .send_compressed(CompressionEncoding::Gzip),
+        )
         .serve(grpc_addr)
         .await
 }

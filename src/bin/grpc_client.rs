@@ -2,6 +2,7 @@ use rand::prelude::*;
 use std::collections::HashMap;
 use std::time::Duration;
 use tokio::task::JoinHandle;
+use tonic::codec::CompressionEncoding;
 use tonic::transport::Channel;
 use tonic::Request;
 
@@ -32,9 +33,15 @@ async fn main() {
     models.push(&MaskRCNN {});
     models.push(&Squeezenet {});
 
-    let client = PredictorClient::connect("http://0.0.0.0:50051")
+    let channel = Channel::builder("http://0.0.0.0:50051".parse().unwrap())
+        .connect()
         .await
         .unwrap();
+
+    let client = PredictorClient::new(channel)
+        .send_compressed(CompressionEncoding::Gzip)
+        .accept_compressed(CompressionEncoding::Gzip);
+
     let mut rng = thread_rng();
     let mut futures: Vec<JoinHandle<(String, Duration)>> = Vec::with_capacity(NUM_REQUESTS);
 
